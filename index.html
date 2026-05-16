@@ -1,2044 +1,995 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Latam5S — Organiza tus envíos con calma</title>
-    <meta name="description" content="Organiza tus envíos sin direcciones confusas ni mensajes perdidos. Latam5S es la herramienta para emprendedores que buscan calma y eficiencia.">
+    <title>Analizador B2B SaaS | Dashboard</title>
     
-    <!-- Tailwind CSS -->
+    <!-- Tailwind CSS (Estilos) -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
     
-    <!-- Feather Icons for Dark Mode Toggle -->
-    <script src="https://unpkg.com/feather-icons"></script>
+    <!-- Babel (Para compilar JSX en el navegador) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- SheetJS (Para leer Excel) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
     <style>
-        /* Estilos base y para la fuente personalizada */
-        body {
-            font-family: "Quicksand", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+        /* Pequeñas animaciones personalizadas */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-        [hidden] { display: none; }
-        select:disabled { background-color: #f3f4f6; cursor: not-allowed; }
-        
-        /* Ocultar flechas en inputs de tipo número */
-        input::-webkit-outer-spin-button,
-        input::-webkit-inner-spin-button {
-            -webkit-appearance: none;
-            margin: 0;
+        .animate-fade-in-up {
+            animation: fadeInUp 0.5s ease-out forwards;
         }
-        input[type=number] {
-            -moz-appearance: textfield;
-        }
-        
-        /* --- NUEVO: Estilos para el Autocompletado --- */
-        .autocomplete-results {
-            position: absolute;
-            width: 100%; /* El 100% de su contenedor padre */
-            border: 1px solid #e5e7eb; /* gray-200 */
-            border-top: none;
-            max-height: 200px;
-            overflow-y: auto;
-            z-index: 10;
-            background-color: #ffffff;
-            border-radius: 0 0 0.375rem 0.375rem; /* rounded-b-md */
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        }
-        .dark .autocomplete-results {
-            background-color: #1f2937; /* gray-800 */
-            border-color: #4b5563; /* gray-600 */
-        }
-        .autocomplete-item {
-            padding: 0.75rem 1rem; /* p-3 px-4 */
-            cursor: pointer;
-        }
-        .autocomplete-item:hover, .autocomplete-item.selected {
-            background-color: #f3f4f6; /* gray-100 */
-        }
-        .dark .autocomplete-item:hover, .dark .autocomplete-item.selected {
-            background-color: #374151; /* gray-700 */
-        }
-        .autocomplete-item strong {
-            color: #D96B4F; /* brand-accent */
-        }
-        .autocomplete-item .new-item {
-            font-weight: 600;
-            color: #D96B4F; /* brand-accent */
-        }
-        .dark .autocomplete-item .new-item {
-            color: #FF8B6A; /* brand-accent-alt */
-        }
-        /* --- FIN NUEVO: Estilos Autocompletado --- */
-
+        /* Custom scrollbar para las tablas */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
     </style>
-
-    <script>
-        // Configuración personalizada para Tailwind CSS
-        tailwind.config = {
-            darkMode: 'class', // Habilitar modo oscuro basado en clase
-            theme: {
-                extend: {
-                    colors: {
-                        'accent': '#D96B4F',
-                        'accent-alt': '#FF8B6A',
-                        'brand-bg': '#d0f0c0',
-                        'brand-card': '#ffffff',
-                        'brand-text': '#2b2b2b',
-                        'brand-muted': '#6b6b6b',
-                        'brand-accent': '#D96B4F', // Color principal para botones y acentos
-                        'brand-accent-alt': '#FF8B6A', // Color de hover y acentos secundarios
-                    },
-                    fontFamily: {
-                        'quicksand': ['Quicksand', 'sans-serif'],
-                    }
-                }
-            }
-        }
-    </script>
 </head>
-<body class="bg-brand-bg font-quicksand antialiased text-brand-text dark:bg-gray-900 dark:text-brand-bg">
+<body class="bg-gray-100 font-sans antialiased text-gray-900">
+    
+    <div id="root"></div>
 
-    <!-- NUEVO: Contenedor de Autenticación -->
-    <div id="auth-container" class="fixed inset-0 bg-gray-100 z-[100] flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl p-6 md:p-8 w-full max-w-md">
-            <!-- Vista de Login -->
-            <div id="login-view">
-                <form id="login-form" class="space-y-4">
-                    <h2 class="text-2xl font-bold text-center text-brand-text dark:text-brand-bg">Iniciar Sesión</h2>
-                    <p class="text-center text-sm text-brand-muted dark:text-gray-400">¡Hola Complicidad Boutique!</p>
-                    <div>
-                        <label for="login-email" class="block text-sm font-semibold text-gray-700 mb-1.5">Correo</label>
-                        <input type="email" id="login-email" required class="input p-3 border border-gray-300 rounded-xl bg-white w-full text-sm focus:outline-none focus:border-accent focus:ring-3 focus:ring-orange-100" placeholder="tu@correo.com">
-                    </div>
-                    <div>
-                        <label for="login-password" class="block text-sm font-semibold text-gray-700 mb-1.5">Contraseña</label>
-                        <input type="password" id="login-password" required class="input p-3 border border-gray-300 rounded-xl bg-white w-full text-sm focus:outline-none focus:border-accent focus:ring-3 focus:ring-orange-100" placeholder="••••••••">
-                    </div>
-                    <button type="submit" class="btn primary w-full bg-gradient-to-r from-accent to-accent-alt text-white py-3 px-4 rounded-xl font-bold text-base shadow-md shadow-accent/20 hover:shadow-lg hover:shadow-accent/30 hover:-translate-y-0.5 transition-all duration-200 inline-flex items-center justify-center gap-2">
-                        Ingresar
-                    </button>
-                    <p class="text-sm text-center">
-                        <a href="#" id="forgot-password-link" class="font-medium text-brand-accent hover:text-brand-accent-alt">¿Olvidaste tu contraseña?</a>
-                    </p>
-                </form>
-            </div>
-        </div>
-    </div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
 
+        // ==========================================
+        // ICONOS SVG (Reemplazo de Lucide)
+        // ==========================================
+        const IconWrapper = ({ children, className }) => (
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+            {children}
+          </svg>
+        );
+        const UploadCloud = ({className}) => <IconWrapper className={className}><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></IconWrapper>;
+        const FileText = ({className}) => <IconWrapper className={className}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></IconWrapper>;
+        const BarChart2 = ({className}) => <IconWrapper className={className}><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></IconWrapper>;
+        const Users = ({className}) => <IconWrapper className={className}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></IconWrapper>;
+        const Package = ({className}) => <IconWrapper className={className}><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></IconWrapper>;
+        const Truck = ({className}) => <IconWrapper className={className}><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></IconWrapper>;
+        const AlertCircle = ({className}) => <IconWrapper className={className}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></IconWrapper>;
+        const CheckCircle = ({className}) => <IconWrapper className={className}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></IconWrapper>;
+        const Lightbulb = ({className}) => <IconWrapper className={className}><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1.3.5 2.6 1.5 3.5.8.8 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></IconWrapper>;
+        const RefreshCw = ({className}) => <IconWrapper className={className}><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></IconWrapper>;
+        const Calendar = ({className}) => <IconWrapper className={className}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></IconWrapper>;
+        const MessageCircle = ({className}) => <IconWrapper className={className}><path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"/></IconWrapper>;
 
-    <!-- Contenedor principal de la APP (Ahora oculto por defecto) -->
-    <div id="main-app" class="p-4 sm:p-6 lg:p-8 hidden">
-
-        <!-- Encabezado -->
-        <header class="mb-6 flex justify-between items-center">
+        // ==========================================
+        // UTILERÍAS: PARSER DE CSV Y JSON
+        // ==========================================
+        const parseCSV = (text) => {
+          const result = [];
+          let row = [];
+          let inQuotes = false;
+          let val = '';
+          
+          for (let i = 0; i < text.length; i++) {
+            let c = text[i];
+            let next = text[i + 1];
             
-            <div>
-                <h1 class="text-3xl font-bold text-brand-text dark:text-brand-bg">Complicidad Boutique</h1>
-                <!-- MODIFICADO: Muestra el email del usuario -->
-                <p class="text-sm text-brand-muted dark:text-gray-400">Usuario: <span id="userIdDisplay" class="font-medium text-brand-text dark:text-brand-bg">Cargando...</span></p>
-            </div>
-
-            <div class="flex space-x-4">
-                <!-- Botón de Modo Oscuro -->
-                <button id="darkModeToggle" class="mt-2 text-sm text-brand-muted dark:text-gray-400 hover:text-brand-accent dark:hover:text-brand-accent-alt transition duration-150">
-                    <i data-feather="moon" class="w-5 h-5 inline-block align-middle dark:hidden"></i>
-                    <i data-feather="sun" class="w-5 h-5 inline-block align-middle hidden dark:inline-block"></i>
-                    Cambiar Tema
-                </button>
-
-                <!-- NUEVO: Botón de Cerrar Sesión -->
-                <button id="logoutButton" class="mt-2 text-sm text-brand-muted dark:text-gray-400 hover:text-brand-accent dark:hover:text-brand-accent-alt transition duration-150">
-                    <i data-feather="log-out" class="w-5 h-5 inline-block align-middle"></i>
-                    Cerrar Sesión
-                </button>
-            </div>
-        </header>
-
-        <!-- Pestañas de Navegación -->
-        <div class="mb-6">
-            <div class="border-b border-gray-200 dark:border-gray-700">
-                <nav class="-mb-px flex space-x-8" aria-label="Tabs" id="tabs">
-                    <!-- Productos -->
-                    <button data-tab="products" class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-brand-muted border-transparent hover:text-brand-accent dark:hover:text-brand-accent-alt hover:border-brand-accent">
-                        Productos
-                    </button>
-                    <!-- Ventas -->
-                    <button data-tab="sales" class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 font-semibold text-sm text-brand-accent border-brand-accent dark:text-brand-accent-alt dark:border-brand-accent-alt">
-                        Ventas
-                    </button>
-                    <!-- Envíos -->
-                    <button data-tab="shipping" class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-brand-muted border-transparent hover:text-brand-accent dark:hover:text-brand-accent-alt hover:border-brand-accent">
-                        Envíos (Logística)
-                    </button>
-                    <!-- NUEVA PESTAÑA: Reportes -->
-                    <button data-tab="reports" class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-brand-muted border-transparent hover:text-brand-accent dark:hover:text-brand-accent-alt hover:border-brand-accent">
-                        Reportes
-                    </button>
-                </nav>
-            </div>
-        </div>
-
-        <!-- Paneles de Contenido -->
-
-        <!-- Panel de Clientes y Envíos (ELIMINADO POR COMPLETO) -->
-
-        <!-- Panel de Ventas -->
-        <div id="sales-panel" class="tab-panel">
-            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                <!-- Columna 1: Formulario de Venta -->
-                <div class="lg:col-span-1 bg-brand-card dark:bg-gray-800 p-6 rounded-lg shadow-lg">
-                    <h2 class="text-xl font-semibold mb-4 text-brand-text dark:text-brand-bg">Registrar Nueva Venta</h2>
-                    <form id="add-sale-form" class="space-y-4">
-                        <div>
-                            <!-- MODIFICADO: Buscador de Clientes con Autocompletado -->
-                            <div class="relative">
-                                <label for="client-search" class="block text-sm font-medium text-brand-muted dark:text-gray-400">Buscar o Registrar Cliente</label>                                <input type="text" id="client-search" placeholder="Escribir teléfono..." class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-brand-bg shadow-sm focus:border-brand-accent focus:ring-brand-accent sm:text-sm">
-                                <input type="hidden" id="sale-client-id">
-                                <!-- Contenedor de autocompletado -->
-                                <div id="client-search-results" class="autocomplete-results hidden"></div>
-                                <p class="text-xs text-brand-muted dark:text-gray-400 mt-1">Escriba un teléfono. Si no existe, se registrará al guardar.</p>
-                            </div>
-                        </div>    
-                        
-                        <!-- Sección de items modificada -->
-                        <div class="border border-gray-200 dark:border-gray-600 rounded-md p-4 space-y-3">
-                            <h3 class="text-md font-semibold text-brand-text dark:text-brand-bg">Items de la Venta</h3>
-                            <div class="space-y-2">
-                                <!-- MODIFICADO: Buscador de Productos (Venta) con Autocompletado -->
-                                <div class="relative">
-                                    <label for="sale-product-search" class="block text-sm font-medium text-brand-muted dark:text-gray-400">Buscar Producto</label>
-                                    <input type="text" id="sale-product-search" placeholder="Escribir nombre del producto..." class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-brand-bg shadow-sm focus:border-brand-accent focus:ring-brand-accent sm:text-sm">
-                                    <input type="hidden" id="sale-product-id">
-                                    <!-- Contenedor de autocompletado -->
-                                    <div id="sale-product-search-results" class="autocomplete-results hidden"></div>
-                                </div>
-
-                                <div class="grid grid-cols-2 gap-2">
-                                    <input type="number" id="sale-item-qty" placeholder="Cantidad" min="1" value="1" class="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-brand-bg shadow-sm sm:text-sm">
-                                    <!-- MODIFICADO: Placeholder -->
-                                    <input type="number" id="sale-item-price" placeholder="Precio Total (por este lote)" min="0" step="0.01" class="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-brand-bg shadow-sm sm:text-sm">
-                                </div>
-                                <div class="grid grid-cols-2 gap-2">
-                                    <input type="text" id="sale-item-color" placeholder="Color (Opcional)" class="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-brand-bg shadow-sm sm:text-sm">
-                                    <input type="text" id="sale-item-talla" placeholder="Talla (Opcional)" class="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-brand-bg shadow-sm sm:text-sm">
-                                </div>
-                                <button type="button" id="add-sale-item-btn" class="w-full text-sm font-medium rounded-md text-white bg-brand-accent hover:bg-brand-accent-alt py-2 focus:ring-brand-accent">
-                                    Agregar Item a la Venta
-                                </button>
-                            </div>
-                            <ul id="current-sale-items" class="text-sm space-y-1 text-brand-text dark:text-brand-bg">
-                                <!-- Items agregados temporalmente -->
-                            </ul>
-                            <div class="text-right font-bold text-lg text-brand-accent dark:text-brand-accent-alt">
-                                Total Venta: S/ <span id="current-sale-total">0.00</span>
-                            </div>
-                        </div>
-                        <!-- Fin del cambio -->
-
-                        <!-- MODIFICADO: Agrupado en cuadrícula -->
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label for="sale-date" class="block text-sm font-medium text-brand-muted dark:text-gray-400">Fecha de Venta</label>
-                                <input type="date" id="sale-date" required class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-brand-bg shadow-sm focus:border-brand-accent focus:ring-brand-accent sm:text-sm">
-                            </div>
-                            <!-- NUEVO CAMPO: Medio de Pago -->
-                            <div>
-                                <label for="sale-payment-method" class="block text-sm font-medium text-brand-muted dark:text-gray-400">Medio de Pago</label>
-                                <select id="sale-payment-method" required class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-brand-bg shadow-sm focus:border-brand-accent focus:ring-brand-accent sm:text-sm">
-                                    <option value="">Seleccione...</option>
-                                    <option value="Efectivo">Efectivo</option>
-                                    <option value="Yape">Yape</option>
-                                    <option value="Plin">Plin</option>
-                                    <option value="Tarjeta">Tarjeta</option>
-                                    <option value="Transferencia">Transferencia</option>
-                                    <option value="Otro">Otro</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <button type="submit" class="w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-brand-accent hover:bg-brand-accent-alt focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-accent">
-                            Guardar Venta y Actualizar Stock
-                        </button>
-                    </form>
-                </div>
-                
-                <!-- Columna 2: Historial de Ventas (MODIFICADO) -->
-                <div class="lg:col-span-3 bg-brand-card dark:bg-gray-800 p-6 rounded-lg shadow-lg">
-                    <h2 class="text-xl font-semibold mb-4 text-brand-text dark:text-brand-bg">Historial de Items Vendidos</h2>
-
-                    <!-- NUEVO: Contenedor de Filtros -->
-                    <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg mb-4 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                        
-                        <!-- Filtro Cliente -->
-                        <div class="relative">
-                            <label for="client-sales-filter-search" class="block text-sm font-medium text-brand-muted dark:text-gray-400">Filtrar por Cliente</label>
-                            <input type="text" id="client-sales-filter-search" placeholder="Buscar teléfono..." class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-brand-bg shadow-sm sm:text-sm">
-                            <input type="hidden" id="client-sales-filter-id">
-                            <div id="client-sales-filter-results" class="autocomplete-results hidden"></div>
-                        </div>
-
-                        <!-- Filtro Producto -->
-                        <div class="relative">
-                            <label for="product-sales-filter-search" class="block text-sm font-medium text-brand-muted dark:text-gray-400">Filtrar por Producto</label>
-                            <input type="text" id="product-sales-filter-search" placeholder="Buscar producto..." class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-brand-bg shadow-sm sm:text-sm">
-                            <input type="hidden" id="product-sales-filter-id">
-                            <div id="product-sales-filter-results" class="autocomplete-results hidden"></div>
-                        </div>
-
-                        <!-- Filtro Fecha -->
-                        <div>
-                            <label for="date-sales-filter" class="block text-sm font-medium text-brand-muted dark:text-gray-400">Filtrar por Fecha</label>
-                            <input type="date" id="date-sales-filter" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-brand-bg shadow-sm sm:text-sm">
-                        </div>
-                        
-                        <!-- Checkbox y Botones -->
-                        <div class="flex items-end space-x-2">
-                            <div class="flex-grow">
-                                <label for="pending-sales-filter-toggle" class="flex items-center">
-                                    <input type="checkbox" id="pending-sales-filter-toggle" checked class="h-4 w-4 text-brand-accent rounded border-gray-300 dark:border-gray-600 focus:ring-brand-accent">
-                                    <span class="ml-2 text-sm text-brand-muted dark:text-gray-400">Solo Pendientes</span>
-                                </label>
-                            </div>
-                            <button id="clear-sales-filter-btn" title="Limpiar Filtros" class="p-2 bg-gray-300 dark:bg-gray-600 text-brand-text dark:text-brand-bg rounded-md hover:bg-gray-400">
-                                <i data-feather="x" class="w-5 h-5"></i>
-                            </button>
-                            <button id="apply-sales-filter-btn" class="p-2 bg-brand-accent text-white rounded-md hover:bg-brand-accent-alt">
-                                <i data-feather="search" class="w-5 h-5"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <!-- FIN: Contenedor de Filtros -->  
-                    
-                    <!-- NUEVO: Contenedor de Acciones Masivas -->
-                    <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg mb-4 flex flex-col md:flex-row gap-4 items-end">
-                        <div class="w-full md:w-1/3">
-                            <label for="mass-shipping-date" class="block text-sm font-medium text-brand-muted dark:text-gray-400">1. Fecha de Envío Masivo</label>
-                            <input type="date" id="mass-shipping-date" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-brand-bg shadow-sm sm:text-sm">
-                        </div>
-                        <div class="w-full md:w-2/3">
-                            <button id="mass-update-shipping-btn" class="w-full md:w-auto inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:ring-green-500">
-                                2. Actualizar Envío de Items Seleccionados
-                            </button>
-                            <p class="text-xs text-brand-muted dark:text-gray-400 mt-1">Seleccione items de la tabla de abajo para marcarlos como "Enviado" con esta fecha.</p>
-                        </div>
-                    </div>
-                    <!-- FIN: Acciones Masivas -->
-                      
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                            <!-- CABECERA DE TABLA MODIFICADA -->
-                            <thead class="bg-gray-50 dark:bg-gray-700">
-                                <tr>
-                                    <!-- NUEVO: Checkbox Seleccionar Todo -->
-                                    <th class="px-2 py-3 text-center">
-                                        <input type="checkbox" id="select-all-sales-checkbox" class="h-4 w-4 text-brand-accent rounded border-gray-300 dark:border-gray-600 focus:ring-brand-accent">
-                                    </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-brand-muted dark:text-gray-400 uppercase tracking-wider">Fecha</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-brand-muted dark:text-gray-400 uppercase tracking-wider">Cliente</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-brand-muted dark:text-gray-400 uppercase tracking-wider">Producto</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-brand-muted dark:text-gray-400 uppercase tracking-wider">Cant.</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-brand-muted dark:text-gray-400 uppercase tracking-wider">Total Item</th>
-                                    <!-- NUEVA COLUMNA -->
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-brand-muted dark:text-gray-400 uppercase tracking-wider">Medio de Pago</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-brand-muted dark:text-gray-400 uppercase tracking-wider">Estado</th>
-                                    <!-- NUEVO: Columna Fecha Envío -->
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-brand-muted dark:text-gray-400 uppercase tracking-wider">Fecha Envío</th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-brand-muted dark:text-gray-400 uppercase tracking-wider">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="sales-list" class="bg-brand-card dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                                <!-- Items vendidos se cargarán aquí -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Panel de Productos -->
-        <div id="products-panel" class="tab-panel" hidden>
-             <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                <!-- Columna 1: Formulario de Productos -->
-                <div class="lg:col-span-1 bg-brand-card dark:bg-gray-800 p-6 rounded-lg shadow-lg">
-                    <h2 class="text-xl font-semibold mb-4 text-brand-text dark:text-brand-bg">Agregar/Actualizar Inventario</h2>
-                    <form id="add-product-form" class="space-y-4">
-                        
-                        <!-- MODIFICADO: Buscador de Productos (Inventario) con Autocompletado -->
-                        <div class="relative">
-                            <label for="product-search-inventory" class="block text-sm font-medium text-brand-muted dark:text-gray-400">Buscar o Crear Producto</label>
-                            <input type="text" id="product-search-inventory" placeholder="Escribir nombre..." class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-brand-bg shadow-sm focus:border-brand-accent focus:ring-brand-accent sm:text-sm">
-                            <input type="hidden" id="product-inventory-id">
-                            <!-- Contenedor de autocompletado -->
-                            <div id="product-search-inventory-results" class="autocomplete-results hidden"></div>
-                            <p class="text-xs text-brand-muted dark:text-gray-400 mt-1">Seleccione un producto para sumar stock, o escriba un nombre nuevo y guarde.</p>
-                        </div>
-                        
-                        <div>
-                            <!-- CAMBIO DE ETIQUETA -->
-                            <label for="product-stock" class="block text-sm font-medium text-brand-muted dark:text-gray-400">Stock (Cantidad a Agregar)</label>
-                            <input type="number" id="product-stock" min="0" value="1" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-brand-bg shadow-sm focus:border-brand-accent focus:ring-brand-accent sm:text-sm">
-                        </div>
-                        <div>
-                            <!-- MODIFICADO: Costo (ObligatorGatorio) -->
-                            <label for="product-cost" class="block text-sm font-medium text-brand-muted dark:text-gray-400">Costo Total (por este lote)</label>
-
-                            <input type="number" id="product-cost" required min="0" step="0.01" placeholder="Costo total del lote" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-brand-bg shadow-sm focus:border-brand-accent focus:ring-brand-accent sm:text-sm">
-                        </div>
-                        
-                        <!-- NUEVO CAMPO DE FECHA -->
-                        <div>
-                            <label for="product-purchase-date" class="block text-sm font-medium text-brand-muted dark:text-gray-400">Fecha de Compra</label>
-                            <input type="date" id="product-purchase-date" required class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-brand-bg shadow-sm focus:border-brand-accent focus:ring-brand-accent sm:text-sm">
-                        </div>
-                        
-                        <button type="submit" class="w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-brand-accent hover:bg-brand-accent-alt focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-accent">
-                            Guardar Producto
-                        </button>
-                    </form>
-                </div>
-                
-                <!-- Columna 2: Inventario -->
-                <div class="lg:col-span-3 bg-brand-card dark:bg-gray-800 p-6 rounded-lg shadow-lg">
-                    <h2 class="text-xl font-semibold mb-4 text-brand-text dark:text-brand-bg">Inventario de Productos</h2>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                            <thead class="bg-gray-50 dark:bg-gray-700">
-                                <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-brand-muted dark:text-gray-400 uppercase tracking-wider">Producto</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-brand-muted dark:text-gray-400 uppercase tracking-wider">Stock</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-brand-muted dark:text-gray-400 uppercase tracking-wider">Costo (c/u)</th>
-                                    <!-- NUEVA COLUMNA -->
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-brand-muted dark:text-gray-400 uppercase tracking-wider">Última Compra</th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-brand-muted dark:text-gray-400 uppercase tracking-wider">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="products-list" class="bg-brand-card dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                                <!-- Productos se cargarán aquí -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <!-- Fin del cambio -->
-
-        <!-- MODIFICADO: Panel de Envíos (Logística) -->
-        <div id="shipping-panel" class="tab-panel" hidden>
-            <div class="bg-brand-card dark:bg-gray-800 p-6 rounded-lg shadow-lg">
-                <h2 class="text-xl font-semibold mb-4 text-brand-text dark:text-brand-bg">Vista de Logística (Envíos por Fecha)</h2>
-
-                <!-- Filtro de Fecha -->
-                <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg mb-4 flex flex-col md:flex-row gap-4 items-end">
-                    <div class="flex-grow">
-                        <label for="shipping-date-filter" class="block text-sm font-medium text-brand-muted dark:text-gray-400">Filtrar por Fecha de Envío</label>
-                        <input type="date" id="shipping-date-filter" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-brand-bg shadow-sm sm:text-sm">
-                    </div>
-                    <button id="shipping-search-btn" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-brand-accent hover:bg-brand-accent-alt">
-                        <i data-feather="search" class="w-5 h-5 mr-2"></i>
-                        Buscar Envíos
-                    </button>
-                </div>
-
-                <!-- Tabla de Todos los Envíos -->
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead class="bg-gray-50 dark:bg-gray-700">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-brand-muted dark:text-gray-400 uppercase tracking-wider">Cliente (Teléfono)</th>
-                                <!-- MODIFICADO: Columna Detalle -->
-                                <th class="px-6 py-3 text-left text-xs font-medium text-brand-muted dark:text-gray-400 uppercase tracking-wider">Detalle del Envío</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-brand-muted dark:text-gray-400 uppercase tracking-wider">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody id="all-shipments-list" class="bg-brand-card dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                            <tr><td colspan="3" class="px-6 py-4 text-center text-brand-muted dark:text-gray-400">Seleccione una fecha y presione "Buscar".</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-        <!-- FIN: Panel de Envíos -->
-        
-        <!-- NUEVO: Panel de Reportes -->
-        <div id="reports-panel" class="tab-panel" hidden>
-            <div class="bg-brand-card dark:bg-gray-800 p-6 rounded-lg shadow-lg">
-                <h2 class="text-xl font-semibold mb-4 text-brand-text dark:text-brand-bg">Reporte de Totales por Día</h2>
-
-                <!-- Filtro de Fecha -->
-                <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg mb-4 flex flex-col md:flex-row gap-4 items-end">
-                    <div class="flex-grow">
-                        <label for="report-date-filter" class="block text-sm font-medium text-brand-muted dark:text-gray-400">Seleccionar Fecha de Venta</label>
-                        <input type="date" id="report-date-filter" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-brand-bg shadow-sm sm:text-sm">
-                    </div>
-                    <button id="report-search-btn" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-brand-accent hover:bg-brand-accent-alt">
-                        <i data-feather="bar-chart-2" class="w-5 h-5 mr-2"></i>
-                        Generar Reporte
-                    </button>
-                </div>
-
-                <!-- Tabla de Resultados -->
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead class="bg-gray-50 dark:bg-gray-700">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-brand-muted dark:text-gray-400 uppercase tracking-wider">Medio de Pago</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-brand-muted dark:text-gray-400 uppercase tracking-wider">N° Transacciones</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-brand-muted dark:text-gray-400 uppercase tracking-wider">Monto Total</th>
-                            </tr>
-                        </thead>
-                        <tbody id="report-results-tbody" class="bg-brand-card dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                            <tr><td colspan="3" class="px-6 py-4 text-center text-brand-muted dark:text-gray-400">Seleccione una fecha y presione "Generar Reporte".</td></tr>
-                        </tbody>
-                        <tfoot class="bg-gray-50 dark:bg-gray-700">
-                            <tr id="report-results-total-row" hidden>
-                                <td class="px-6 py-4 text-left font-bold text-brand-text dark:text-brand-bg uppercase">Total General</td>
-                                <td id="report-total-transactions" class="px-6 py-4 text-left font-bold text-brand-text dark:text-brand-bg"></td>
-                                <td id="report-grand-total" class="px-6 py-4 text-right font-bold text-brand-text dark:text-brand-bg"></td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
-            </div>
-        </div>
-        <!-- FIN: Panel de Reportes -->
-
-        <footer class="pt-10 pb-2 bg-bg-soft flex-shrink-0 flex justify-center items-center gap-2 text-gray-500 text-sm mt-auto">
-            <span>Powered by</span>
-                <svg height="20" viewBox="0 0 90 22" xmlns="http://www.w3.org/2000/svg">
-                    <text x="0" y="18" style="font-family: Quicksand, sans-serif; font-size: 20px; font-weight: 700; fill: #D96B4F;">Latam5S</text>
-                </svg>
-        </footer>
-
-    </div>
-
-    <!-- Modal para mensajes -->
-    <div id="modal" class="fixed inset-0 z-50 overflow-y-auto bg-gray-900 bg-opacity-75 dark:bg-gray-800 dark:bg-opacity-75" hidden>
-        <div class="flex items-center justify-center min-h-screen px-4">
-            <div class="bg-brand-card dark:bg-gray-700 rounded-lg p-6 shadow-xl max-w-sm w-full">
-                <h3 id="modal-title" class="text-lg font-semibold text-brand-text dark:text-brand-bg">Cargando...</h3>
-                <div class="mt-2">
-                    <p id="modal-message" class="text-sm text-brand-muted dark:text-gray-300">Por favor, espere.</p>
-                </div>
-                <div class="mt-4 flex justify-end">
-                    <button id="modal-close-btn" type="button" class="inline-flex justify-center px-4 py-2 text-sm font-medium text-white bg-brand-accent hover:bg-brand-accent-alt border border-transparent rounded-md" hidden>
-                        Cerrar
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-
-    <!-- Firebase SDKs -->
-    <script type="module">
-        // Importar funciones de Firebase
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        // MODIFICADO: Importar funciones de autenticación
-        import { 
-            getAuth, 
-            signInWithEmailAndPassword,
-            sendPasswordResetEmail,
-            signOut,
-            onAuthStateChanged 
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { 
-            getFirestore, 
-            setLogLevel, 
-            doc, 
-            getDoc, 
-            addDoc, 
-            setDoc, 
-            updateDoc, 
-            deleteDoc, 
-            onSnapshot, 
-            collection, 
-            query, 
-            where, 
-            getDocs,
-            orderBy,
-            limit,
-            writeBatch
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // --- MANEJO DE MODO OSCURO (DE LA CONFIGURACIÓN PROPORCIONADA) ---
-        function setupDarkMode() {
-            const toggle = document.getElementById('darkModeToggle');
-            const isDarkMode = localStorage.getItem('darkMode') === 'true';
-
-            if (isDarkMode) {
-                document.documentElement.classList.add('dark');
+            if (c === '"' && inQuotes && next === '"') {
+              val += '"';
+              i++;
+            } else if (c === '"') {
+              inQuotes = !inQuotes;
+            } else if (c === ',' && !inQuotes) {
+              row.push(val);
+              val = '';
+            } else if ((c === '\n' || c === '\r') && !inQuotes) {
+              if (c === '\r' && next === '\n') i++; 
+              row.push(val);
+              if (row.some(v => v.trim() !== '')) result.push(row);
+              row = [];
+              val = '';
+            } else {
+              val += c;
             }
-
-            toggle.addEventListener('click', () => {
-                document.documentElement.classList.toggle('dark');
-                const isNowDark = document.documentElement.classList.contains('dark');
-                localStorage.setItem('darkMode', isNowDark);
-                if (typeof feather !== 'undefined') {
-                    feather.replace();
-                }
-            });
-            
-            if (typeof feather !== 'undefined') {
-                feather.replace();
+          }
+          
+          if (val || text[text.length - 1] === ',') row.push(val);
+          if (row.length > 0 && row.some(v => v.trim() !== '')) result.push(row);
+          if (result.length < 2) return [];
+          
+          const headers = result[0].map(h => h.trim());
+          const data = [];
+          
+          for (let i = 1; i < result.length; i++) {
+            let obj = {};
+            for (let j = 0; j < headers.length; j++) {
+              obj[headers[j]] = result[i][j] ? result[i][j].trim() : '';
             }
-        }
-        document.addEventListener('DOMContentLoaded', setupDarkMode);
-
-
-        // --- VARIABLES GLOBALES ---
-        let db, auth, app;
-        let userId;
-        let isAuthReady = false;
-        
-        // Colecciones de Firestore
-        let clientsCollection, salesCollection, productsCollection;
-        let saleItemsCollection;
-        // ELIMINADAS: shipmentsCollection, allShipmentsCollection
-
-        // Estado temporal
-        let currentSaleItems = [];
-        let currentSaleTotal = 0;
-        let productsCache = {}; // Cache para stock y costos
-        
-        // Listeners de OnSnapshot
-        let salesListener = null;
-        
-        // --- MODIFICADO: Cache para los buscadores ---
-        let allClientsCache = []; // { id, name, phone, normalizedText }
-        let allProductsCache = []; // { id, name, stock, costo }
-
-        // --- NUEVO: IDs DE ELEMENTOS DEL DOM (MOVIMOS TODO AQUÍ) ---
-        
-        // Elementos de Autenticación
-        const authContainer = document.getElementById('auth-container');
-        const loginView = document.getElementById('login-view');
-        const loginForm = document.getElementById('login-form');
-        const forgotPasswordLink = document.getElementById('forgot-password-link');
-        const mainApp = document.getElementById('main-app');
-        const logoutButton = document.getElementById('logoutButton');
-        
-        // Elementos de Pestañas y Modal
-        const tabs = document.querySelectorAll('.tab-btn');
-        const panels = document.querySelectorAll('.tab-panel');
-        const modal = document.getElementById('modal');
-        const modalTitle = document.getElementById('modal-title');
-        const modalMessage = document.getElementById('modal-message');
-        const modalCloseBtn = document.getElementById('modal-close-btn');
-
-        // Elementos Pestaña Clientes (ELIMINADOS)
-
-        // Elementos Pestaña Ventas
-        const saleForm = document.getElementById('add-sale-form');
-        const salesList = document.getElementById('sales-list');
-        const addSaleItemBtn = document.getElementById('add-sale-item-btn');
-        const currentSaleItemsList = document.getElementById('current-sale-items');
-        const currentSaleTotalEl = document.getElementById('current-sale-total');
-        // ELIMINADO: newClientFields
-
-        // Elementos Pestaña Productos
-        const productForm = document.getElementById('add-product-form');
-        const productsList = document.getElementById('products-list');
-
-        // --- NUEVO: Elementos Pestaña Envíos (Logística) ---
-        const shippingPanel = document.getElementById('shipping-panel');
-        const shippingDateFilter = document.getElementById('shipping-date-filter');
-        const shippingSearchBtn = document.getElementById('shipping-search-btn');
-        const allShipmentsList = document.getElementById('all-shipments-list');
-        // --- FIN ---
-
-        // --- NUEVO: Elementos Pestaña Reportes ---
-        const reportsPanel = document.getElementById('reports-panel');
-        const reportDateFilter = document.getElementById('report-date-filter');
-        const reportSearchBtn = document.getElementById('report-search-btn');
-        const reportResultsTbody = document.getElementById('report-results-tbody');
-        const reportResultsTotalRow = document.getElementById('report-results-total-row');
-        const reportTotalTransactions = document.getElementById('report-total-transactions');
-        const reportGrandTotal = document.getElementById('report-grand-total');
-        // --- FIN ---
-
-        // --- NUEVO: Elementos Filtro Ventas ---
-        const clientSalesFilterSearch = document.getElementById('client-sales-filter-search');
-        const clientSalesFilterId = document.getElementById('client-sales-filter-id');
-        const clientSalesFilterResults = document.getElementById('client-sales-filter-results');
-        const productSalesFilterSearch = document.getElementById('product-sales-filter-search');
-        const productSalesFilterId = document.getElementById('product-sales-filter-id');
-        const productSalesFilterResults = document.getElementById('product-sales-filter-results');
-        const dateSalesFilter = document.getElementById('date-sales-filter');
-        const pendingSalesFilterToggle = document.getElementById('pending-sales-filter-toggle');
-        const applySalesFilterBtn = document.getElementById('apply-sales-filter-btn');
-        const clearSalesFilterBtn = document.getElementById('clear-sales-filter-btn');
-        
-        // --- NUEVO: Elementos Acciones Masivas Ventas ---
-        const massShippingDateInput = document.getElementById('mass-shipping-date');
-        const massUpdateShippingBtn = document.getElementById('mass-update-shipping-btn');
-        const selectAllSalesCheckbox = document.getElementById('select-all-sales-checkbox');
-        // --- FIN ---
-
-        // Elementos de Buscadores (Autocompletado)
-        const clientSearchInput = document.getElementById('client-search');
-        const clientSearchHiddenId = document.getElementById('sale-client-id');
-        const clientSearchResults = document.getElementById('client-search-results');
-        
-        const saleProductSearchInput = document.getElementById('sale-product-search');
-        const saleProductHiddenId = document.getElementById('sale-product-id');
-        const saleProductSearchResults = document.getElementById('sale-product-search-results');
-        
-        const productInventorySearchInput = document.getElementById('product-search-inventory');
-        const productInventoryHiddenId = document.getElementById('product-inventory-id');
-        const productInventorySearchResults = document.getElementById('product-search-inventory-results');
-        
-        // --- FIN DE IDs DE ELEMENTOS ---
-
-        // Configuración de tu proyecto
-        const appId = 'mi-app-ventas'; // O cualquier nombre que quieras
-        const firebaseConfig = {
-            apiKey: "AIzaSyBe_H0VfS-8K-n3Ihu-Io2q4SYDZAwbKoQ",
-            authDomain: "compliventas-fc79c.firebaseapp.com",
-            projectId: "compliventas-fc79c",
-            storageBucket: "compliventas-fc79c.firebasestorage.app",
-            messagingSenderId: "734491005717",
-            appId: "1:734491005717:web:85f0be05bc345cfd6bcf1c"
+            data.push(obj);
+          }
+          return data;
         };
 
-        // --- INICIALIZACIÓN ---
-        try {
-            app = initializeApp(firebaseConfig);
-            db = getFirestore(app);
-            auth = getAuth(app);
-            setLogLevel('Debug');
+        const safeJSONParse = (str) => {
+          if (!str) return {};
+          try { return JSON.parse(str); } catch (e) { return {}; }
+        };
 
-            // --- LÓGICA DE AUTENTICACIÓN (MUY MODIFICADA) ---
-            onAuthStateChanged(auth, async (user) => {
-                if (user) {
-                    // --- USUARIO HA INICIADO SESIÓN ---
-                    userId = user.uid;
-                    document.getElementById('userIdDisplay').textContent = user.email; // Mostrar email
+        const parseSafeDate = (val) => {
+          if (!val) return null;
+          if (val instanceof Date) {
+            return isNaN(val.getTime()) ? null : val;
+          }
+          if (typeof val === 'number') {
+            const d = new Date(Math.round((val - 25569) * 86400 * 1000));
+            return isNaN(d.getTime()) ? null : d;
+          }
+          if (typeof val === 'string') {
+            let str = val.replace(' ', 'T');
+            let d = new Date(str);
+            if (!isNaN(d.getTime())) return d;
+            
+            const parts = val.split(/[\/\-\s]/);
+            if (parts.length >= 3 && parts[2].length === 4) {
+              d = new Date(`${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}T00:00:00`);
+              if (!isNaN(d.getTime())) return d;
+            }
+          }
+          return null;
+        };
+
+        // ==========================================
+        // COMPONENTE PRINCIPAL
+        // ==========================================
+        function DashboardB2B() {
+          const [excelFile, setExcelFile] = useState(null);
+          const [kpis, setKpis] = useState(null);
+          const [loading, setLoading] = useState(false);
+          const [error, setError] = useState('');
+
+          const handleFileChange = (e) => {
+            setExcelFile(e.target.files[0]);
+            setError('');
+          };
+
+          const procesarDatos = async () => {
+            if (!excelFile) {
+              setError("Por favor, sube el archivo Excel (.xlsx) para generar el reporte completo.");
+              return;
+            }
+
+            if (!window.XLSX) {
+              setError("La librería de Excel se está cargando. Por favor, intenta de nuevo en un segundo.");
+              return;
+            }
+
+            setLoading(true);
+            setError('');
+
+            try {
+              const reader = new FileReader();
+              
+              reader.onload = (e) => {
+                try {
+                  const data = new Uint8Array(e.target.result);
+                  const workbook = window.XLSX.read(data, { type: 'array', cellDates: true });
+
+                  const getSheetData = (namePart) => {
+                    const sheetName = workbook.SheetNames.find(n => n.toLowerCase().includes(namePart.toLowerCase()));
+                    if (!sheetName) return null;
+                    return window.XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: "" });
+                  };
+
+                  const usersData = getSheetData('user') || getSheetData('usuario');
+                  const configData = getSheetData('config');
+                  const ordersData = getSheetData('order') || getSheetData('orden');
+                  const backlogData = getSheetData('backlog') || getSheetData('historico');
+
+                  if (!usersData || !configData || !ordersData || !backlogData) {
+                    setError(`El Excel no contiene las 4 hojas necesarias. Hojas encontradas: ${workbook.SheetNames.join(', ')}. Asegúrate de tener: Users, Config, Orders, Backlog.`);
+                    setLoading(false);
+                    return;
+                  }
+
+                  // 2. Cálculos de KPIs
+                  const totalUsuarios = usersData.length;
+                  const planes = {};
+                  const proPagadosIDs = new Set();
+                  const proPruebaIDs = new Set();
+                  const gratisUsadoIDs = new Set();
+                  const gratisNuevoIDs = new Set();
+                  
+                  const usersMap = {};
+
+                  usersData.forEach(u => {
+                    const plan = (u.Plan || 'Desconocido').trim();
+                    const hasUsedTrial = String(u.HasUsedTrial || '').trim().toLowerCase() === 'true';
+                    const id = u.UID || u.MerchantID || u.id;
+                    const phone = String(u.Phone || u.Telefono || u.whatsapp || '');
+
+                    usersMap[id] = { id, phone, plan, hasUsedTrial, configurado: false, ordenes: 0 };
+                    planes[plan] = (planes[plan] || 0) + 1;
                     
-                    authContainer.classList.add('hidden');
-                    mainApp.classList.remove('hidden');
-                    
-                    if (typeof feather !== 'undefined') {
-                        feather.replace();
+                    if (plan === 'Pro') {
+                        proPagadosIDs.add(id); 
+                    } else if (plan === 'Pro (Prueba)') {
+                        proPruebaIDs.add(id);
+                    } else if (plan === 'Gratis') {
+                        if (hasUsedTrial) {
+                            gratisUsadoIDs.add(id);
+                        } else {
+                            gratisNuevoIDs.add(id);
+                        }
                     }
+                  });
+                  
+                  const configUnicosSet = new Set(configData.map(c => c.MerchantID));
+                  const configUnicos = configUnicosSet.size;
+                  const tasaAdopcion = totalUsuarios > 0 ? (configUnicos / totalUsuarios) * 100 : 0;
+
+                  let proPagadosConfigurados = 0;
+                  let proPruebaConfigurados = 0;
+                  let gratisUsadoConfigurados = 0;
+                  let gratisNuevoConfigurados = 0;
+                  
+                  configUnicosSet.forEach(id => {
+                      if (usersMap[id]) usersMap[id].configurado = true;
+                      
+                      if (proPagadosIDs.has(id)) proPagadosConfigurados++;
+                      if (proPruebaIDs.has(id)) proPruebaConfigurados++;
+                      if (gratisUsadoIDs.has(id)) gratisUsadoConfigurados++;
+                      if (gratisNuevoIDs.has(id)) gratisNuevoConfigurados++;
+                  });
+                  
+                  const totalProPagados = proPagadosIDs.size;
+                  const adopcionProPagados = totalProPagados > 0 ? (proPagadosConfigurados / totalProPagados) * 100 : 0;
+                  
+                  const totalProPrueba = proPruebaIDs.size;
+                  const adopcionProPrueba = totalProPrueba > 0 ? (proPruebaConfigurados / totalProPrueba) * 100 : 0;
+
+                  const totalGratisUsado = gratisUsadoIDs.size;
+                  const adopcionGratisUsado = totalGratisUsado > 0 ? (gratisUsadoConfigurados / totalGratisUsado) * 100 : 0;
+
+                  const totalGratisNuevo = gratisNuevoIDs.size;
+                  const adopcionGratisNuevo = totalGratisNuevo > 0 ? (gratisNuevoConfigurados / totalGratisNuevo) * 100 : 0;
+
+                  const todasOrdenes = [...ordersData, ...backlogData];
+                  
+                  const merchantNames = {};
+                  configData.forEach(c => {
+                    const jsonData = safeJSONParse(c.DataJSON);
+                    merchantNames[c.MerchantID] = jsonData.merchantName || c.MerchantID;
+                  });
+
+                  let pendientes = 0;
+                  let enviadas = 0;
+                  let proPagadosOrdersCount = 0;
+                  let proPruebaOrdersCount = 0;
+                  let gratisUsadoOrdersCount = 0;
+                  let gratisNuevoOrdersCount = 0;
+                  const couriersCount = {};
+                  const merchantVentas = {};
+
+                  const ordersByMonth = {};
+                  const ordersByDate = {};
+                  const ordersByDayOfWeek = { 0:0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0 };
+                  const ordersByHour = Array.from({ length: 24 }, () => 0); 
+
+                  todasOrdenes.forEach(o => {
+                    if (o.Status === 'PENDIENTE') pendientes++;
+                    if (o.Status === 'ENVIADO') enviadas++;
                     
-                    try {
-                        document.getElementById('sale-date').valueAsDate = new Date();
-                        document.getElementById('product-purchase-date').valueAsDate = new Date();
-                        document.getElementById('mass-shipping-date').valueAsDate = new Date();
-                        document.getElementById('shipping-date-filter').valueAsDate = new Date();
-                        document.getElementById('report-date-filter').valueAsDate = new Date(); // <-- NUEVA FECHA
-                    } catch(e) {
-                        console.warn("Error al inicializar fechas (ignorar si es la primera carga):", e.message);
+                    if (usersMap[o.MerchantID]) usersMap[o.MerchantID].ordenes++;
+
+                    if (proPagadosIDs.has(o.MerchantID)) proPagadosOrdersCount++;
+                    if (proPruebaIDs.has(o.MerchantID)) proPruebaOrdersCount++;
+                    if (gratisUsadoIDs.has(o.MerchantID)) gratisUsadoOrdersCount++;
+                    if (gratisNuevoIDs.has(o.MerchantID)) gratisNuevoOrdersCount++;
+
+                    const rawDate = o.Date || o.date || o.DATE || o.Fecha || o.fecha || o.FECHA || o.CreatedAt;
+                    const dateObj = parseSafeDate(rawDate);
+                    
+                    if (dateObj) {
+                      const year = dateObj.getFullYear();
+                      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+                      const day = String(dateObj.getDate()).padStart(2, '0');
+                      
+                      const monthKey = `${year}-${month}`;
+                      const dateKey = `${year}-${month}-${day}`;
+                      const dayOfWeek = dateObj.getDay();
+                      const hourOfDay = dateObj.getHours();
+
+                      ordersByMonth[monthKey] = (ordersByMonth[monthKey] || 0) + 1;
+                      ordersByDate[dateKey] = (ordersByDate[dateKey] || 0) + 1;
+                      ordersByDayOfWeek[dayOfWeek]++;
+                      ordersByHour[hourOfDay]++;
                     }
 
-                    // Definir rutas de las colecciones (dependientes del userId)
-                    clientsCollection = collection(db, `artifacts/${appId}/users/${userId}/clients`);
-                    salesCollection = collection(db, `artifacts/${appId}/users/${userId}/sales`);
-                    productsCollection = collection(db, `artifacts/${appId}/users/${userId}/products`);
-                    saleItemsCollection = collection(db, `artifacts/${appId}/users/${userId}/saleItems`);
-                    // ELIMINADAS: shipmentsCollection, allShipmentsCollection
+                    const jsonData = safeJSONParse(o.DataJSON);
+                    const courier = jsonData.courier || 'Desconocido';
+                    if (courier !== 'Desconocido') {
+                        couriersCount[courier] = (couriersCount[courier] || 0) + 1;
+                    }
 
-                    isAuthReady = true;
-                    // Cargar datos iniciales
-                    loadClients(); // (Sigue cargando el caché en segundo plano)
-                    loadSales();
-                    loadProducts();
+                    const mName = merchantNames[o.MerchantID] || o.MerchantID;
+                    if(mName) {
+                        merchantVentas[mName] = (merchantVentas[mName] || 0) + 1;
+                    }
+                  });
 
+                  const totalOrdenes = todasOrdenes.length;
+                  const tasaCumplimiento = totalOrdenes > 0 ? (enviadas / totalOrdenes) * 100 : 0;
 
-                } else {
-                    // --- USUARIO NO HA INICIADO SESIÓN ---
-                    userId = null;
-                    isAuthReady = false;
-                    
-                    authContainer.classList.remove('hidden');
-                    mainApp.classList.add('hidden');
-                    
-                    if(salesList) salesList.innerHTML = '';
-                    if(productsList) productsList.innerHTML = '';
-                    if(allShipmentsList) allShipmentsList.innerHTML = ''; 
-                    if(reportResultsTbody) reportResultsTbody.innerHTML = ''; // <-- NUEVO
-                    
-                    if (salesListener) salesListener(); 
+                  const topCouriers = Object.entries(couriersCount)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 3);
+
+                  const topMerchants = Object.entries(merchantVentas)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 5);
+
+                  const sortedMonths = Object.entries(ordersByMonth)
+                    .sort((a, b) => a[0].localeCompare(b[0])); 
+                  
+                  const sortedDatesDesc = Object.entries(ordersByDate)
+                    .sort((a, b) => b[0].localeCompare(a[0]))
+                    .slice(0, 7)
+                    .reverse(); 
+
+                  const daysMap = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+                  const formattedDaysOfWeek = daysMap.map((name, idx) => ({ name, count: ordersByDayOfWeek[idx] }));
+
+                  const sortedHoursDesc = ordersByHour
+                    .map((count, hour) => ({ hour: `${String(hour).padStart(2, '0')}:00`, count }))
+                    .filter(h => h.count > 0)
+                    .sort((a, b) => b.count - a.count); 
+
+                  const targetLeads = Object.values(usersMap).filter(u => u.plan === 'Gratis');
+                  const leadsUsados = targetLeads.filter(u => u.hasUsedTrial).sort((a, b) => b.ordenes - a.ordenes);
+                  const leadsNuevos = targetLeads.filter(u => !u.hasUsedTrial).sort((a, b) => b.ordenes - a.ordenes);
+
+                  const insights = [];
+                  
+                  if (totalGratisNuevo > 0) {
+                    insights.push({
+                      type: 'info',
+                      title: 'Oportunidad de Trial',
+                      text: `Hay ${totalGratisNuevo} usuarios en plan 'Gratis' que AÚN NO usan su prueba. Inicia una campaña automatizada para ofrecerles sus 14 días gratis y engancharlos.`
+                    });
+                  }
+
+                  if (totalGratisUsado > 0) {
+                     insights.push({
+                      type: 'warning',
+                      title: 'Recuperación de Usuarios',
+                      text: `Hay ${totalGratisUsado} usuarios que usaron su prueba pero no pagaron (Downgrade). Puedes ofrecerles un descuento especial del 20% en su primer mes para recuperarlos.`
+                    });
+                  }
+
+                  const tasaPendientes = totalOrdenes > 0 ? (pendientes / totalOrdenes) * 100 : 0;
+                  if (tasaPendientes > 20) {
+                    insights.push({
+                      type: 'warning',
+                      title: 'Cuello de Botella Operativo',
+                      text: `El ${tasaPendientes.toFixed(1)}% de las órdenes están 'PENDIENTES'. Revisa si es por falta de stock o si los usuarios olvidan actualizar el estado manualmente.`
+                    });
+                  }
+
+                  if (topCouriers.length > 0) {
+                    insights.push({
+                      type: 'strategy',
+                      title: `Dominancia de ${topCouriers[0][0]}`,
+                      text: `Al ser el courier dominante, considera desarrollar una integración API directa con ellos para generar guías automáticamente. Será un gran gancho de ventas.`
+                    });
+                  }
+
+                  const proPagadosPercentage = totalOrdenes > 0 ? (proPagadosOrdersCount / totalOrdenes) * 100 : 0;
+                  const proPruebaPercentage = totalOrdenes > 0 ? (proPruebaOrdersCount / totalOrdenes) * 100 : 0;
+                  const gratisUsadoPercentage = totalOrdenes > 0 ? (gratisUsadoOrdersCount / totalOrdenes) * 100 : 0;
+                  const gratisNuevoPercentage = totalOrdenes > 0 ? (gratisNuevoOrdersCount / totalOrdenes) * 100 : 0;
+
+                  if (sortedHoursDesc.length > 0) {
+                    const topHour = sortedHoursDesc[0];
+                    insights.push({
+                      type: 'success',
+                      title: `Hora Pico: ${topHour.hour} ⏰`,
+                      text: `El mayor volumen de registros ocurre alrededor de las ${topHour.hour} (${topHour.count} operaciones). Es el momento ideal para lanzar comunicados importantes dentro del dashboard.`
+                    });
+                  }
+
+                  setKpis({
+                    usuarios: { total: totalUsuarios, planes, activos: configUnicos, tasaAdopcion },
+                    operaciones: { total: totalOrdenes, pendientes, enviadas, tasaCumplimiento },
+                    topCouriers,
+                    topMerchants,
+                    insights,
+                    planStats: { 
+                      pagados: { total: totalProPagados, configurados: proPagadosConfigurados, adopcion: adopcionProPagados, ordenes: proPagadosOrdersCount, porcentajeOrdenes: proPagadosPercentage },
+                      prueba: { total: totalProPrueba, configurados: proPruebaConfigurados, adopcion: adopcionProPrueba, ordenes: proPruebaOrdersCount, porcentajeOrdenes: proPruebaPercentage },
+                      gratisUsado: { total: totalGratisUsado, configurados: gratisUsadoConfigurados, adopcion: adopcionGratisUsado, ordenes: gratisUsadoOrdersCount, porcentajeOrdenes: gratisUsadoPercentage },
+                      gratisNuevo: { total: totalGratisNuevo, configurados: gratisNuevoConfigurados, adopcion: adopcionGratisNuevo, ordenes: gratisNuevoOrdersCount, porcentajeOrdenes: gratisNuevoPercentage }
+                    },
+                    temporalStats: {
+                      months: sortedMonths,
+                      recentDates: sortedDatesDesc,
+                      daysOfWeek: formattedDaysOfWeek,
+                      peakHours: sortedHoursDesc
+                    },
+                    leads: {
+                      nuevos: leadsNuevos,
+                      usados: leadsUsados
+                    }
+                  });
+                  
+                  setLoading(false);
+                } catch (err) {
+                  console.error(err);
+                  setError("Hubo un error procesando el interior del Excel. Verifica su estructura.");
+                  setLoading(false);
                 }
-            });
+              };
+              
+              reader.onerror = () => {
+                setError("Error al leer el archivo desde tu computadora.");
+                setLoading(false);
+              };
+              
+              reader.readAsArrayBuffer(excelFile);
 
-        } catch (e) {
-            console.error("Error al inicializar Firebase:", e);
-            showModal("Error de Conexión", "No se pudo conectar a Firebase. Verifique la configuración.");
-        }
-        
-        // --- LISTENERS DE AUTENTICACIÓN ---
-        loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('login-email').value;
-            const password = document.getElementById('login-password').value;
-            showModal("Iniciando Sesión", "Por favor, espere...", false);
-            try {
-                await signInWithEmailAndPassword(auth, email, password);
-                hideModal();
-            } catch (error) {
-                console.error("Error de login:", error.code);
-                hideModal();
-                showModal("Error de Login", "Correo o contraseña incorrectos. Por favor, inténtelo de nuevo.");
-            }
-        });
-
-        logoutButton.addEventListener('click', async () => {
-            try {
-                await signOut(auth);
-            } catch (error) {
-                console.error("Error al cerrar sesión:", error);
-                showModal("Error", "No se pudo cerrar sesión.");
-            }
-        });
-        
-        forgotPasswordLink.addEventListener('click', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('login-email').value;
-            if (!email) {
-                showModal("Correo Requerido", "Por favor, ingrese su correo en el campo 'Correo' para poder restablecer la contraseña.");
-                return;
-            }
-            showModal("Procesando", "Enviando correo de restablecimiento...", false);
-            try {
-                await sendPasswordResetEmail(auth, email);
-                // NO ocultamos el modal, solo cambiamos su contenido:
-                showModal("Correo Enviado", "Si su correo está registrado, recibirá un enlace para crear una nueva contraseña. Revise su bandeja de entrada (y spam).");
-            } catch (error) {
-                console.error("Error al enviar correo de restablecimiento:", error);
-                hideModal();
-                showModal("Error", "No se pudo enviar el correo de restablecimiento. Intente de nuevo más tarde.");
-            }
-        });
-        // --- FIN DE LÓGICA DE AUTENTICACIÓN ---
-
-
-        // --- MANEJO DE PESTAÑAS ---
-        function resetTabStyles() {
-            tabs.forEach(t => {
-                t.classList.remove('text-brand-accent', 'border-brand-accent', 'dark:text-brand-accent-alt', 'dark:border-brand-accent-alt', 'font-semibold');
-                t.classList.add('text-brand-muted', 'border-transparent', 'hover:text-brand-accent', 'dark:hover:text-brand-accent-alt', 'hover:border-brand-accent', 'font-medium');
-            });
-        }
-        
-        tabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                resetTabStyles();
-                panels.forEach(p => p.setAttribute('hidden', true));
-                
-                tab.classList.remove('text-brand-muted', 'border-transparent', 'hover:text-brand-accent', 'dark:hover:text-brand-accent-alt', 'hover:border-brand-accent');
-                tab.classList.add('text-brand-accent', 'border-brand-accent', 'dark:text-brand-accent-alt', 'dark:border-brand-accent-alt', 'font-semibold');
-
-                const panelId = tab.getAttribute('data-tab') + '-panel';
-                document.getElementById(panelId).removeAttribute('hidden');
-                
-                if (typeof feather !== 'undefined') {
-                    feather.replace();
-                }
-            });
-        });
-        
-        // --- MANEJO DE MODAL (Mensajes) ---
-        modalCloseBtn.addEventListener('click', () => modal.setAttribute('hidden', true));
-
-        function showModal(title, message, showClose = true) {
-            modalTitle.textContent = title;
-            modalMessage.textContent = message;
-            modalCloseBtn.style.display = showClose ? 'inline-flex' : 'none';
-            modal.removeAttribute('hidden');
-        }
-
-        function hideModal() {
-            modal.setAttribute('hidden', true);
-        }
-
-        // --- Formateador de moneda (ej. S/ para Soles) ---
-        const currencyFormatter = new Intl.NumberFormat('es-PE', {
-            style: 'currency',
-            currency: 'PEN',
-            minimumFractionDigits: 2
-        });
-
-        // --- NUEVA FUNCIÓN DE NORMALIZACIÓN ---
-        function normalizeString(str) {
-            if (!str) return '';
-            return str
-                .toUpperCase() // Convertir a mayúsculas
-                .normalize("NFD") // Descomponer tildes
-                .replace(/[\u0300-\u036f]/g, ""); // Eliminar tildes
-        }
-
-        // --- NUEVA FUNCIÓN PROPER CASE ---
-        function toProperCase(str) {
-            if (!str) return '';
-            return str.toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
-        }
-
-        // --- LÓGICA DE AUTOCOMPLETADO ---
-        let activeAutocomplete = null; 
-
-        function showAutocompleteResults(container, results) {
-            container.innerHTML = '';
-            if (results.length === 0) {
-                container.classList.add('hidden');
-                return;
-            }
-            results.forEach(item => {
-                const div = document.createElement('div');
-                div.className = 'autocomplete-item';
-                div.innerHTML = item.html;
-                div.onclick = () => item.onClick();
-                container.appendChild(div);
-            });
-            container.classList.remove('hidden');
-            activeAutocomplete = container;
-        }
-
-        function hideAllAutocomplete() {
-            if (clientSearchResults) clientSearchResults.classList.add('hidden');
-            if (saleProductSearchResults) saleProductSearchResults.classList.add('hidden');
-            if (productInventorySearchResults) productInventorySearchResults.classList.add('hidden');
-            if(clientSalesFilterResults) clientSalesFilterResults.classList.add('hidden');
-            if(productSalesFilterResults) productSalesFilterResults.classList.add('hidden');
-            activeAutocomplete = null;
-        }
-        
-        // --- NUEVO: Función para copiar al portapapeles ---
-        function copyTextToClipboard(text) {
-            const textArea = document.createElement("textarea");
-            textArea.value = text;
-            
-            // Estilos para hacerlo invisible
-            textArea.style.position = "fixed";
-            textArea.style.top = "-9999px";
-            textArea.style.left = "-9999px";
-            
-            document.body.appendChild(textArea);
-            textArea.select();
-            
-            try {
-                document.execCommand('copy');
-                showModal("¡Copiado!", "Resumen copiado al portapapeles.");
             } catch (err) {
-                console.error('Error al copiar:', err);
-                showModal("Error", "No se pudo copiar el texto. Inténtelo manualmente.");
+              console.error(err);
+              setError("Hubo un error al iniciar la lectura del archivo.");
+              setLoading(false);
             }
-            
-            document.body.removeChild(textArea);
-        }
-        
-        document.addEventListener('click', (e) => {
-            if (activeAutocomplete) {
-                if (!activeAutocomplete.contains(e.target) && 
-                    e.target !== clientSearchInput &&
-                    e.target !== saleProductSearchInput &&
-                    e.target !== productInventorySearchInput &&
-                    e.target !== clientSalesFilterSearch && 
-                    e.target !== productSalesFilterSearch
-                    ) {
-                    hideAllAutocomplete();
-                }
-            }
-        });
+          };
 
-        // --- LÓGICA DEL BUSCADOR DE CLIENTES (VENTAS) ---
-        clientSearchInput.addEventListener('input', (e) => {
-            const query = e.target.value.toLowerCase();
-            if (query.length === 0) {
-                hideAllAutocomplete();
-                clientSearchHiddenId.value = '';
-                return;
-            }
-            const results = allClientsCache.filter(client => 
-                client.phone.includes(query)
-            );
-            const resultItems = results.map(client => ({
-                html: `<strong>${client.phone}</strong>`,
-                onClick: () => selectClient(client.id, client.phone)
-            }));
-            showAutocompleteResults(clientSearchResults, resultItems);
-        });
+          const resetear = () => {
+            setExcelFile(null);
+            setKpis(null);
+            setError('');
+          };
 
-        function selectClient(id, phone = '') {
-            clientSearchInput.value = phone; 
-            clientSearchHiddenId.value = id;
-            hideAllAutocomplete();
-        }
+          const StatCard = ({ title, value, subtitle, icon: Icon, colorClass }) => (
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-gray-500 text-sm font-medium">{title}</h3>
+                <div className={`p-2 rounded-lg ${colorClass}`}>
+                  <Icon className="w-5 h-5" />
+                </div>
+              </div>
+              <p className="text-2xl font-bold text-gray-800">{value}</p>
+              {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
+            </div>
+          );
 
-        // --- LÓGICA DEL BUSCADOR DE PRODUCTOS (VENTAS) ---
-        saleProductSearchInput.addEventListener('input', (e) => {
-            const query = e.target.value.toLowerCase();
-            if (query.length === 0) {
-                hideAllAutocomplete();
-                saleProductHiddenId.value = '';
-                return;
-            }
-            const results = allProductsCache.filter(prod => 
-                prod.name.toLowerCase().includes(query)
-            );
-            const resultItems = results.map(prod => ({
-                html: `<strong>${prod.name}</strong> (Stock: ${prod.stock > 0 ? prod.stock : 'SIN STOCK'})`,
-                onClick: () => selectSaleProduct(prod.id, prod.name, prod.stock)
-            }));
-            showAutocompleteResults(saleProductSearchResults, resultItems);
-        });
-
-        function selectSaleProduct(id, name, stock) {
-            if (stock <= 0) {
-                showModal("Sin Stock", `El producto "${name}" no tiene stock disponible.`);
-                saleProductSearchInput.value = '';
-                saleProductHiddenId.value = '';
-                hideAllAutocomplete();
-                return;
-            }
-            saleProductSearchInput.value = name;
-            saleProductHiddenId.value = id;
-            hideAllAutocomplete();
-        }
-
-        // --- LÓGICA DEL BUSCADOR DE PRODUCTOS (INVENTARIO) ---
-        productInventorySearchInput.addEventListener('input', (e) => {
-            const query = e.target.value.toLowerCase();
-            productInventoryHiddenId.value = ''; 
-            if (query.length === 0) {
-                hideAllAutocomplete();
-                return;
-            }
-            const results = allProductsCache.filter(prod => 
-                prod.name.toLowerCase().includes(query)
-            );
-            const resultItems = results.map(prod => ({
-                html: `<strong>${prod.name}</strong>`,
-                onClick: () => selectInventoryProduct(prod.id, prod.name)
-            }));
-            showAutocompleteResults(productInventorySearchResults, resultItems);
-        });
-
-        function selectInventoryProduct(id, name) {
-            productInventorySearchInput.value = name;
-            productInventoryHiddenId.value = id;
-            hideAllAutocomplete();
-        }
-
-        // --- LÓGICA AUTOCOMPLETADO PARA FILTROS DE VENTAS ---
-        clientSalesFilterSearch.addEventListener('input', (e) => {
-            const query = e.target.value.toLowerCase();
-            if (query.length === 0) {
-                clientSalesFilterResults.classList.add('hidden');
-                clientSalesFilterId.value = '';
-                return;
-            }
-            const results = allClientsCache.filter(client => client.phone.includes(query));
-            const resultItems = results.map(client => ({
-                html: `<strong>${client.phone}</strong>`,
-                onClick: () => selectSalesFilterClient(client.id, client.phone)
-            }));
-            showAutocompleteResults(clientSalesFilterResults, resultItems);
-        });
-
-        function selectSalesFilterClient(id, phone) {
-            clientSalesFilterSearch.value = phone;
-            clientSalesFilterId.value = id;
-            clientSalesFilterResults.classList.add('hidden');
-        }
-
-        productSalesFilterSearch.addEventListener('input', (e) => {
-            const query = e.target.value.toLowerCase();
-            if (query.length === 0) {
-                productSalesFilterResults.classList.add('hidden');
-                productSalesFilterId.value = '';
-                return;
-            }
-            const results = allProductsCache.filter(prod => prod.name.toLowerCase().includes(query));
-            const resultItems = results.map(prod => ({
-                html: `<strong>${prod.name}</strong> (Stock: ${prod.stock})`,
-                onClick: () => selectSalesFilterProduct(prod.id, prod.name)
-            }));
-            showAutocompleteResults(productSalesFilterResults, resultItems);
-        });
-
-        function selectSalesFilterProduct(id, name) {
-            productSalesFilterSearch.value = name;
-            productSalesFilterId.value = id;
-            productSalesFilterResults.classList.add('hidden');
-        }
-        // --- FIN LÓGICA AUTOCOMPLETADO FILTROS ---
-
-
-        // --- LÓGICA DE CLIENTES (SOLO CARGA DE CACHÉ) ---
-        function loadClients() {
-            if (!isAuthReady) return; 
-
-            // Activar la pestaña Ventas por defecto
-            document.querySelector('.tab-btn[data-tab="sales"]').click();
-
-            onSnapshot(clientsCollection, (snapshot) => {
-                allClientsCache = []; // Limpiar cache
-                snapshot.forEach(doc => {
-                    const client = doc.data();
-                    const clientId = doc.id;
-                    allClientsCache.push({
-                        id: clientId,
-                        phone: client.phone,
-                        normalizedText: client.phone.toLowerCase() 
-                    });
-                });
-            }, (error) => {
-                console.error("Error al cargar clientes:", error);
-            });
-        }
-        // --- FIN LÓGICA CLIENTES ---
-        
-
-        // --- LÓGICA DE VENTAS (FORMULARIO) ---
-        function updateSaleTotal() {
-            currentSaleTotal = currentSaleItems.reduce((acc, item) => acc + item.total, 0);
-            currentSaleTotalEl.textContent = currentSaleTotal.toFixed(2);
-        }
-
-        function renderCurrentSaleItems() {
-            currentSaleItemsList.innerHTML = '';
-            currentSaleItems.forEach((item, index) => {
-                const li = document.createElement('li');
-                li.className = "flex justify-between items-center text-xs";
-                li.innerHTML = `
-                    <span>${item.qty} x ${toProperCase(item.desc)} ${item.color || ''} ${item.talla || ''} (S/ ${item.price.toFixed(2)} c/u)</span>
-                    <button type="button" data-index="${index}" class="btn-remove-item text-red-500 font-bold px-1 hover:text-red-700">X</button>
-                `;
-                currentSaleItemsList.appendChild(li);
-            });
-            updateSaleTotal();
-        }
-
-        currentSaleItemsList.addEventListener('click', (e) => {
-            if (e.target.classList.contains('btn-remove-item')) {
-                const index = parseInt(e.target.getAttribute('data-index'), 10);
-                currentSaleItems.splice(index, 1);
-                renderCurrentSaleItems();
-            }
-        });
-
-        addSaleItemBtn.addEventListener('click', async () => {
-            const qty = parseInt(document.getElementById('sale-item-qty').value, 10);
-            const totalPrice = parseFloat(document.getElementById('sale-item-price').value);
-
-            if (!qty || qty <= 0) {
-                 showModal("Datos incompletos", "La cantidad debe ser mayor a 0.");
-                 return;
-            }
-            if (totalPrice === null || totalPrice < 0) {
-                 showModal("Datos incompletos", "Debe ingresar un precio total válido.");
-                 return;
-            }
-
-            const unitPrice = (totalPrice === 0) ? 0 : (totalPrice / qty); 
-            const color = normalizeString(document.getElementById('sale-item-color').value.trim());
-            const talla = normalizeString(document.getElementById('sale-item-talla').value.trim());
-            let productCost, productStock;
-
-            const productId = saleProductHiddenId.value;
-            // MODIFICADO: Aplicar normalizeString al nombre del producto al seleccionarlo
-            const productName = normalizeString(saleProductSearchInput.value);
-
-            if (productId && productName) {
-                const product = productsCache[productId];
-                productCost = product.cost;
-                productStock = product.stock;
-            } else {
-                showModal("Datos incompletos", "Seleccione un producto, cantidad y un precio de venta válido.");
-                return;
-            }
-            
-            const existingItem = currentSaleItems.find(item => item.productId === productId && item.color === color && item.talla === talla);
-            if(existingItem) {
-                showModal("Item duplicado", "Ese producto (con mismo color y talla) ya está en la lista. Bórrelo para agregar una nueva cantidad.");
-                return;
-            }
-
-            currentSaleItems.push({
-                productId,
-                desc: productName,
-                qty,
-                price: unitPrice, 
-                costo: productCost, 
-                total: totalPrice, 
-                totalCosto: qty * productCost,
-                color: color || '',
-                talla: talla || ''
-            });
-            renderCurrentSaleItems();
-
-            saleProductSearchInput.value = '';
-            saleProductHiddenId.value = '';
-            document.getElementById('sale-item-qty').value = '1';
-            document.getElementById('sale-item-price').value = '';
-            document.getElementById('sale-item-color').value = '';
-            document.getElementById('sale-item-talla').value = '';
-        });
-
-        saleForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            if (!isAuthReady) return;
-
-            const date = document.getElementById('sale-date').value;
-            const medioDePago = document.getElementById('sale-payment-method').value;
-
-            // --- NUEVA LÓGICA: BUSCAR O CREAR CLIENTE ---
-            let finalClientId, clientName, clientPhone;
-            
-            const phoneQuery = clientSearchInput.value.trim();
-            const selectedClientId = clientSearchHiddenId.value;
-
-            if (!phoneQuery) {
-                showModal("Venta incompleta", "Debe ingresar un teléfono de cliente.");
-                return;
-            }
-            
-            const clientData = allClientsCache.find(c => c.id === selectedClientId);
-            if (clientData && clientData.phone === phoneQuery) {
-                finalClientId = clientData.id;
-                clientName = clientData.phone;
-                clientPhone = clientData.phone;
-            } else {
-                showModal("Validando Cliente", "Buscando o registrando cliente...", false);
-                try {
-                    const q = query(clientsCollection, where("phone", "==", phoneQuery));
-                    const querySnapshot = await getDocs(q);
-
-                    if (!querySnapshot.empty) {
-                        const existingClientDoc = querySnapshot.docs[0];
-                        finalClientId = existingClientDoc.id;
-                        clientName = phoneQuery;
-                        clientPhone = phoneQuery;
-                    } else {
-                        const newClientRef = await addDoc(clientsCollection, {
-                            phone: phoneQuery
-                        });
-                        finalClientId = newClientRef.id;
-                        clientName = phoneQuery;
-                        clientPhone = phoneQuery;
-                    }
-                } catch (error) {
-                    console.error("Error al buscar/crear cliente:", error);
-                    hideModal();
-                    showModal("Error", "No se pudo verificar el cliente.");
-                    return;
-                }
-            }
-            // --- FIN NUEVA LÓGICA ---
-
-            if (currentSaleItems.length === 0 || !date || !medioDePago) {
-                showModal("Venta incompleta", "Agregue al menos un item, elija una fecha y un medio de pago.");
-                return;
-            }
-            
-            const totalCostoVenta = currentSaleItems.reduce((acc, item) => acc + item.totalCosto, 0);
-
-            showModal("Procesando Venta", "Guardando y actualizando stock...", false);
-
-            try {
-                const newSaleRef = await addDoc(salesCollection, { 
-                    clientId: finalClientId, 
-                    clientName,
-                    clientPhone,
-                    date,
-                    medioDePago: medioDePago, 
-                    items: currentSaleItems,
-                    total: currentSaleTotal,
-                    totalCosto: totalCostoVenta, 
-                    enviado: false 
-                });
-
-                for (const item of currentSaleItems) {
-                    await addDoc(saleItemsCollection, {
-                        saleId: newSaleRef.id, 
-                        clientId: finalClientId,
-                        clientName: clientName,
-                        date: date,
-                        medioDePago: medioDePago, 
-                        enviado: false, 
-                        fechaEnvio: '', // Importante inicializarlo
-                        productId: item.productId,
-                        desc: item.desc,
-                        qty: item.qty,
-                        price: item.price,
-                        costo: item.costo,
-                        total: item.total,
-                        totalCosto: item.totalCosto,
-                        color: item.color,
-                        talla: item.talla
-                    });
-                }
-
-                for (const item of currentSaleItems) {
-                    const productRef = doc(productsCollection, item.productId);
-                    const product = productsCache[item.productId];
-                    if (product) {
-                        const newStock = product.stock - item.qty;
-                        await updateDoc(productRef, { stock: newStock });
-                    }
-                }
-
-                saleForm.reset();
-                currentSaleItems = [];
-                renderCurrentSaleItems();
-                document.getElementById('sale-date').valueAsDate = new Date();
-                clientSearchInput.value = '';
-                clientSearchHiddenId.value = '';
+          return (
+            <div className="min-h-screen p-4 md:p-8">
+              <div className="max-w-7xl mx-auto">
                 
-                hideModal();
-                showModal("Venta Exitosa", "La venta se guardó y el stock se actualizó.");
-                
-            } catch (error) {
-                console.error("Error al guardar venta:", error);
-                hideModal();
-                showModal("Error", "No se pudo guardar la venta o actualizar el stock.");
-            }
-        });
+                {/* Cabecera */}
+                <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Analizador B2B SaaS</h1>
+                    <p className="text-gray-600 mt-1">Sube tu archivo Maestro para generar KPIs e insights automáticos</p>
+                  </div>
+                  {kpis && (
+                    <button 
+                      onClick={resetear}
+                      className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors shadow-sm font-medium"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      Nuevo Análisis
+                    </button>
+                  )}
+                </div>
 
-        // --- LÓGICA DE VENTAS (HISTORIAL Y FILTROS) ---
-        function loadSales() {
-            if (!isAuthReady) return;
-            if (salesListener) salesListener();
-
-            const filtroCliente = clientSalesFilterId.value;
-            const filtroProducto = productSalesFilterId.value;
-            const filtroFecha = dateSalesFilter.value;
-            const soloPendientes = pendingSalesFilterToggle.checked;
-            
-            let q = query(saleItemsCollection, orderBy("date", "desc"));
-
-            const isFiltering = filtroCliente || filtroProducto || filtroFecha;
-
-            if (filtroCliente) q = query(q, where("clientId", "==", filtroCliente));
-            if (filtroProducto) q = query(q, where("productId", "==", filtroProducto));
-            if (filtroFecha) q = query(q, where("date", "==", filtroFecha));
-            if (soloPendientes || !isFiltering) q = query(q, where("enviado", "==", false));
-            
-            salesListener = onSnapshot(q, (snapshot) => {
-                salesList.innerHTML = '';
-                if (snapshot.empty) {
-                    salesList.innerHTML = '<tr><td colspan="10" class="px-6 py-4 text-center text-brand-muted dark:text-gray-400">No se encontraron items con esos filtros.</td></tr>';
-                    return;
-                }
-
-                snapshot.forEach(doc => {
-                    const item = doc.data(); 
-                    const tr = document.createElement('tr');
+                {/* Zona de Subida */}
+                {!kpis && (
+                  <div className="bg-white rounded-2xl shadow-sm p-6 md:p-10 mb-8 border border-gray-200">
+                    <h2 className="text-xl font-bold mb-6 border-b pb-3 text-gray-800">1. Carga de Archivo Excel</h2>
+                    {error && <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-lg text-sm flex items-center gap-2 border border-red-100"><AlertCircle className="w-5 h-5"/> {error}</div>}
                     
-                    let estadoHtml = item.enviado 
-                        ? '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 dark:bg-green-700 text-green-800 dark:text-green-200">Enviado</span>'
-                        : '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 dark:bg-yellow-700 text-yellow-800 dark:text-yellow-200">Pendiente</span>';
-                    
-                    let productDesc = toProperCase(item.desc);
-                    if (item.color) productDesc += ` (${toProperCase(item.color)})`;
-                    if (item.talla) productDesc += ` [${item.talla}]`;
-
-                    tr.innerHTML = `
-                        <td class="px-2 py-4 text-center">
-                            <input type="checkbox" class="sale-item-checkbox" data-item-id="${doc.id}">
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-brand-muted dark:text-gray-400">${item.date}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-brand-text dark:text-brand-bg">${item.clientName}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-brand-muted dark:text-gray-400">${productDesc}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-brand-muted dark:text-gray-400">${item.qty}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-brand-muted dark:text-gray-400">${currencyFormatter.format(item.total)}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-brand-muted dark:text-gray-400">${item.medioDePago || 'N/A'}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-brand-muted dark:text-gray-400">${estadoHtml}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-brand-muted dark:text-gray-400">${item.fechaEnvio || 'N/A'}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <button data-item-id="${doc.id}" class="btn-delete-sale-item text-red-600 hover:text-red-900">Eliminar Item</button>
-                        </td>
-                    `;
-                    salesList.appendChild(tr);
-                });
-            }, (error) => {
-                console.error("Error al cargar items de ventas (¡REVISA SI NECESITAS UN ÍNDICE!):", error);
-                salesList.innerHTML = `<tr><td colspan="10" class="px-6 py-4 text-center text-red-500">Error: ${error.message}. Es probable que necesites crear un índice en Firestore. Revisa la consola (F12).</td></tr>`;
-            });
-        }
-        
-        salesList.addEventListener('click', async (e) => {
-            // MODIFICADO: Ahora busca la nueva clase 'btn-delete-sale-item'
-            if (e.target.classList.contains('btn-delete-sale-item')) {
-                
-                // MODIFICADO: Obtiene el ID del ITEM, no de la venta
-                const itemId = e.target.getAttribute('data-item-id');
-                
-                // MODIFICADO: Nuevo texto de confirmación
-                if (confirm("¿Estás seguro de que deseas eliminar ESTE ITEM? (El total de la venta original no se recalculará y el stock no se restaurará).")) {
-                    try {
-                        // MODIFICADO: Lógica de eliminación simple
-                        await deleteDoc(doc(saleItemsCollection, itemId));
-                        showModal("Éxito", "Item eliminado.");
-                        // El listener onSnapshot de loadSales() refrescará la tabla.
+                    <div className="mb-8">
+                      <div className="border-2 border-dashed border-blue-200 rounded-2xl p-12 flex flex-col items-center justify-center text-center bg-blue-50/50 hover:bg-blue-50 transition-colors duration-300 w-full">
+                        <UploadCloud className="w-16 h-16 text-blue-500 mb-4" />
+                        <h3 className="font-bold text-gray-800 text-xl">Sube tu archivo Maestro (.xlsx)</h3>
+                        <p className="text-gray-500 mt-2 mb-6 max-w-md text-sm">El archivo debe contener las hojas: <span className="font-semibold text-gray-700">Users, Config, Orders y Backlog</span>.</p>
                         
-                    } catch (error) {
-                        console.error("Error al eliminar item:", error);
-                        showModal("Error", "No se pudo eliminar el item.");
-                    }
-                }
-            }
-        });
-
-        // Listeners para los botones de filtro
-        applySalesFilterBtn.addEventListener('click', () => loadSales());
-        
-        clearSalesFilterBtn.addEventListener('click', () => {
-            clientSalesFilterSearch.value = '';
-            clientSalesFilterId.value = '';
-            productSalesFilterSearch.value = '';
-            productSalesFilterId.value = '';
-            dateSalesFilter.value = '';
-            pendingSalesFilterToggle.checked = true;
-            loadSales();
-        });
-        
-        // Listenlers para Acciones Masivas
-        selectAllSalesCheckbox.addEventListener('change', () => {
-            const isChecked = selectAllSalesCheckbox.checked;
-            const itemCheckboxes = salesList.querySelectorAll('.sale-item-checkbox');
-            itemCheckboxes.forEach(checkbox => checkbox.checked = isChecked);
-        });
-
-        massUpdateShippingBtn.addEventListener('click', async () => {
-            if (!isAuthReady) return;
-            
-            const newShippingDate = massShippingDateInput.value;
-            const selectedItemsCheckboxes = salesList.querySelectorAll('.sale-item-checkbox:checked');
-            
-            if (selectedItemsCheckboxes.length === 0) {
-                showModal("Error", "No ha seleccionado ningún item de la lista.");
-                return;
-            }
-            if (!newShippingDate) {
-                showModal("Error", "Por favor, seleccione una Fecha de Envío válida.");
-                return;
-            }
-            if (!confirm(`¿Está seguro de que desea marcar ${selectedItemsCheckboxes.length} items como "Enviado" con fecha ${newShippingDate}?`)) {
-                return;
-            }
-
-            showModal("Actualización Masiva", `Actualizando ${selectedItemsCheckboxes.length} items...`, false);
-            
-            try {
-                const batch = writeBatch(db);
-                selectedItemsCheckboxes.forEach(checkbox => {
-                    const itemId = checkbox.getAttribute('data-item-id');
-                    const itemRef = doc(saleItemsCollection, itemId);
-                    batch.update(itemRef, {
-                        enviado: true,
-                        fechaEnvio: newShippingDate
-                    });
-                });
-                await batch.commit();
-                
-                hideModal();
-                showModal("Éxito", "Items actualizados masivamente.");
-                selectAllSalesCheckbox.checked = false;
-                massShippingDateInput.value = '';
-            } catch (error) {
-                console.error("Error en actualización masiva:", error);
-                hideModal();
-                showModal("Error", "No se pudieron actualizar los items. " + error.message);
-            }
-        });
-        // --- FIN Listeners Acciones Masivas ---
-
-
-        // --- LÓGICA DE PRODUCTOS (INVENTARIO) ---
-        async function createOrUpdateProduct(name, stockToAdd, newUnitCost, purchaseDate) {
-            if (stockToAdd <= 0 || newUnitCost < 0 || !name || !purchaseDate) {
-                throw new Error("Datos de producto inválidos. Se requiere nombre, stock positivo, costo >= 0 y fecha.");
-            }
-            
-            const q = query(productsCollection, where("name", "==", name));
-            const querySnapshot = await getDocs(q);
-            let productId;
-
-            if (querySnapshot.empty) {
-                const newDocRef = await addDoc(productsCollection, { 
-                    name: name, 
-                    stock: stockToAdd, 
-                    cost: newUnitCost,
-                    purchaseDate: purchaseDate
-                });
-                productId = newDocRef.id;
-            } else {
-                const productDoc = querySnapshot.docs[0];
-                const productRef = productDoc.ref;
-                productId = productDoc.id;
-                const productData = productDoc.data();
-
-                const oldStock = productData.stock || 0;
-                const oldCost = productData.cost || 0;
-                const newTotalStock = oldStock + stockToAdd;
-
-                let newAverageCost = newUnitCost; 
-                if (newTotalStock > 0) { 
-                    const oldTotalValue = oldStock * oldCost;
-                    const newTotalValue = stockToAdd * newUnitCost; 
-                    newAverageCost = (oldTotalValue + newTotalValue) / newTotalStock;
-                }
-                await updateDoc(productRef, {
-                    stock: newTotalStock,
-                    cost: newAverageCost,
-                    purchaseDate: purchaseDate
-                });
-            }
-            return productId;
-        }
-
-        productForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            if (!isAuthReady) return;
-            
-            const name = normalizeString(productInventorySearchInput.value.trim());
-            const stockToAdd = parseInt(document.getElementById('product-stock').value, 10);
-            const totalCost = parseFloat(document.getElementById('product-cost').value);
-            const purchaseDate = document.getElementById('product-purchase-date').value;
-            
-            if (!purchaseDate) {
-                showModal("Datos incompletos", "Debe seleccionar una fecha de compra.");
-                return;
-            }
-            if (!name) {
-                showModal("Datos incompletos", "Debe ingresar un nombre de producto.");
-                return;
-            }
-            if (!stockToAdd || stockToAdd <= 0) {
-                 showModal("Datos incompletos", "La cantidad a agregar debe ser mayor a 0.");
-                 return;
-            }
-            if (totalCost === null || totalCost < 0) {
-                 showModal("Datos incompletos", "Debe ingresar un costo total válido.");
-                 return;
-            }
-
-            const newUnitCost = (totalCost === 0) ? 0 : (totalCost / stockToAdd);
-            showModal("Actualizando Inventario", "Guardando producto...", false);
-
-            try {
-                await createOrUpdateProduct(name, stockToAdd, newUnitCost, purchaseDate);
-                hideModal();
-                showModal("Éxito", `Inventario de "${name}" actualizado.`);
-                productForm.reset();
-                document.getElementById('product-purchase-date').valueAsDate = new Date();
-                productInventorySearchInput.value = '';
-                productInventoryHiddenId.value = '';            
-            } catch (error) {
-                console.error("Error al guardar/actualizar producto:", error);
-                hideModal();
-                showModal("Error", "No se pudo actualizar el inventario. " + error.message);
-            }
-        });
-
-        function loadProducts() {
-            if (!isAuthReady) return;
-
-            onSnapshot(productsCollection, (snapshot) => {
-                productsList.innerHTML = '';
-                allProductsCache = [];
-                productsCache = {};
-
-                snapshot.forEach(doc => {
-                    const product = doc.data();
-                    const productId = doc.id;
-                    productsCache[productId] = { ...product, id: productId }; 
-
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-brand-text dark:text-brand-bg">${toProperCase(product.name)}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-brand-muted dark:text-gray-400">${product.stock}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-brand-muted dark:text-gray-400">${currencyFormatter.format(product.cost)}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-brand-muted dark:text-gray-400">${product.purchaseDate || 'N/A'}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <button data-id="${productId}" class="btn-delete-product text-red-600 hover:text-red-900">Eliminar</button>
-                        </td>
-                    `;
-                    productsList.appendChild(tr);
-
-                    allProductsCache.push({
-                        id: productId,
-                        name: product.name,
-                        stock: product.stock,
-                        cost: product.cost
-                    });
-                });
-            }, (error) => {
-                console.error("Error al cargar productos:", error);
-                if (error.code === 'permission-denied' || error.code === 'failed-precondition') {
-                    showModal("Error de Permisos", "No se pudieron cargar los productos. Asegúrese de que las reglas de seguridad de su proyecto Firestore estén configuradas correctamente para permitir lecturas en la ruta 'users/" + userId + "/products'.");
-                }
-            });
-        }
-        
-        productsList.addEventListener('click', async (e) => {
-            if (e.target.classList.contains('btn-delete-product')) {
-                const id = e.target.getAttribute('data-id');
-                // MODIFICACIÓN: Lógica de eliminación segura de productos
-                showModal("Verificando...", "Revisando historial de ventas...", false);
-                try {
-                    const q = query(saleItemsCollection, where("productId", "==", id), limit(1));
-                    const querySnapshot = await getDocs(q);
-
-                    if (!querySnapshot.empty) {
-                        hideModal();
-                        showModal("No se puede eliminar", "Este producto tiene ventas asociadas y no puede ser eliminado.");
-                        return;
-                    }
-
-                    hideModal();
-                    if (confirm("¿Estás seguro de que deseas eliminar este producto? No tiene ventas asociadas.")) {
-                        await deleteDoc(doc(productsCollection, id));
-                        showModal("Éxito", "Producto eliminado.");
-                    }
-                } catch (error) {
-                    hideModal();
-                    showModal("Error", "No se pudo verificar o eliminar el producto.");
-                }
-            }
-        });
-
-
-        // --- LÓGICA DE LA PESTAÑA DE ENVÍOS (LOGÍSTICA) ---
-        // MODIFICADO: Leer de 'saleItems' en lugar de 'allShipments'
-        shippingSearchBtn.addEventListener('click', () => {
-            loadAllShipments();
-        });
-
-        async function loadAllShipments() {
-            if (!isAuthReady) return;
-
-            const filterDate = shippingDateFilter.value;
-            if (!filterDate) {
-                showModal("Error", "Por favor, seleccione una fecha para buscar.");
-                return;
-            }
-
-            allShipmentsList.innerHTML = '<tr><td colspan="3" class="px-6 py-4 text-center text-brand-muted dark:text-gray-400">Buscando envíos...</td></tr>';
-            
-            try {
-                // 1. Crear la consulta a saleItems (¡Necesitará índice!)
-                const q = query(saleItemsCollection, 
-                                where("enviado", "==", true), 
-                                where("fechaEnvio", "==", filterDate),
-                                orderBy("clientName") // Ordenar por cliente
-                            );
-                
-                const querySnapshot = await getDocs(q);
-                
-                if (querySnapshot.empty) {
-                    allShipmentsList.innerHTML = '<tr><td colspan="3" class="px-6 py-4 text-center text-brand-muted dark:text-gray-400">No se encontraron envíos para esta fecha.</td></tr>';
-                    return;
-                }
-                
-                // 2. Agrupar los items por cliente en el navegador
-                const shipmentsByClient = new Map();
-                querySnapshot.forEach(doc => {
-                    const item = doc.data();
-                    const clientId = item.clientId;
-
-                    if (!shipmentsByClient.has(clientId)) {
-                        shipmentsByClient.set(clientId, {
-                            clienteName: item.clientName,
-                            fechaEnvio: item.fechaEnvio,
-                            items: []
-                        });
-                    }
-                    // Añadir el item (en el formato que espera Wpp)
-                    shipmentsByClient.get(clientId).items.push({
-                        desc: item.desc,
-                        qty: item.qty,
-                        color: item.color,
-                        talla: item.talla,
-                        description: `${item.qty} x ${item.desc} ${item.color || ''} ${item.talla || ''}`
-                    });
-                });
-
-                // 3. Renderizar la tabla con los datos agrupados
-                allShipmentsList.innerHTML = ''; 
-                
-                shipmentsByClient.forEach((shipment, clientId) => {
+                        <label className="cursor-pointer bg-blue-600 text-white px-8 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-all shadow-sm hover:shadow-md">
+                          {excelFile ? 'Cambiar archivo' : 'Seleccionar archivo Excel'}
+                          <input 
+                            type="file" 
+                            accept=".xlsx, .xls" 
+                            className="hidden" 
+                            onChange={handleFileChange}
+                          />
+                        </label>
+                        {excelFile && (
+                          <div className="mt-6 inline-flex items-center gap-2 text-sm text-green-700 font-medium bg-green-50 px-5 py-2.5 rounded-full border border-green-200">
+                            <CheckCircle className="w-5 h-5"/> 
+                            {excelFile.name}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                     
-                    // --- NUEVO: Ordenar los items alfabéticamente ---
-                    shipment.items.sort((a, b) => {
-                        const descA = a.desc || a.description || '';
-                        const descB = b.desc || b.description || '';
-                        return descA.localeCompare(descB);
-                    });
-                    // --- FIN NUEVO ---
+                    <button 
+                      onClick={procesarDatos}
+                      disabled={loading || !excelFile}
+                      className={`w-full py-4 rounded-xl font-bold text-white transition-all flex items-center justify-center gap-3 text-lg
+                        ${(loading || !excelFile) ? 'bg-gray-300 cursor-not-allowed' : 'bg-gray-900 hover:bg-gray-800 shadow-md hover:shadow-lg'}`}
+                    >
+                      {loading ? (
+                        <><RefreshCw className="w-6 h-6 animate-spin" /> Analizando hojas de Excel...</>
+                      ) : (
+                        <><BarChart2 className="w-6 h-6" /> Generar Reporte Completo</>
+                      )}
+                    </button>
+                  </div>
+                )}
 
-                    const itemsJson = JSON.stringify(shipment.items);
+                {/* DASHBOARD DE RESULTADOS */}
+                {kpis && (
+                  <div className="space-y-6 animate-fade-in-up">
                     
-                    // --- NUEVO: Lógica de agrupación y formato para la tabla ---
-                    const groupedItems = new Map();
-                    let totalPrendas = 0; // (No se usa aquí, pero se mantiene para la lógica de parseo)
+                    {/* Tarjetas Principales */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <StatCard 
+                        title="Total Usuarios" 
+                        value={kpis.usuarios.total} 
+                        subtitle={`${kpis.usuarios.activos} con tienda configurada`}
+                        icon={Users} 
+                        colorClass="bg-blue-100 text-blue-600"
+                      />
+                      <StatCard 
+                        title="Tasa de Adopción" 
+                        value={`${kpis.usuarios.tasaAdopcion.toFixed(1)}%`} 
+                        subtitle="Usuarios que completaron onboarding"
+                        icon={BarChart2} 
+                        colorClass="bg-purple-100 text-purple-600"
+                      />
+                      <StatCard 
+                        title="Órdenes Históricas" 
+                        value={kpis.operaciones.total} 
+                        subtitle={`${kpis.operaciones.pendientes} pendientes actualmente`}
+                        icon={Package} 
+                        colorClass="bg-green-100 text-green-600"
+                      />
+                      <StatCard 
+                        title="Tasa Cumplimiento" 
+                        value={`${kpis.operaciones.tasaCumplimiento.toFixed(1)}%`} 
+                        subtitle="Pedidos en estado ENVIADO"
+                        icon={CheckCircle} 
+                        colorClass="bg-yellow-100 text-yellow-600"
+                      />
+                    </div>
 
-                    // 1. Parsear y Agrupar items (lógica copiada de generateShipmentWhatsAppSummary)
-                    shipment.items.forEach(item => {
-                        let qty = 0;
-                        let desc = '';
-                        let color = '';
-                        let talla = '';
-                        let isGroupable = false;
+                    {/* Sección Especial: Usabilidad por Plan */}
+                    {kpis.planStats && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mt-2 mb-2">
+                        
+                        {/* Tarjeta PRO Pagados */}
+                        <div className="bg-gradient-to-br from-blue-900 to-blue-800 rounded-xl shadow-md p-6 border border-blue-700 text-white flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-center gap-2 mb-4 border-b border-blue-600 pb-3">
+                              <span className="text-2xl">💎</span>
+                              <h3 className="font-bold text-lg">Plan PRO</h3>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 mb-4">
+                               <div className="bg-white/10 p-3 rounded-lg backdrop-blur-sm border border-white/10">
+                                 <p className="text-blue-200 text-[10px] uppercase font-bold tracking-wider">Adopción</p>
+                                 <p className="text-xl font-bold mt-1">{kpis.planStats.pagados.adopcion.toFixed(1)}%</p>
+                                 <p className="text-xs text-blue-300 mt-1">{kpis.planStats.pagados.configurados}/{kpis.planStats.pagados.total} users</p>
+                               </div>
+                               <div className="bg-white/10 p-3 rounded-lg backdrop-blur-sm border border-white/10">
+                                 <p className="text-blue-200 text-[10px] uppercase font-bold tracking-wider">Pedidos</p>
+                                 <p className="text-xl font-bold mt-1">{kpis.planStats.pagados.ordenes}</p>
+                                 <p className="text-xs text-blue-300 mt-1">{kpis.planStats.pagados.porcentajeOrdenes.toFixed(1)}% del total</p>
+                               </div>
+                            </div>
+                          </div>
+                          <div className="bg-white/10 p-3 rounded-lg backdrop-blur-sm border border-white/10 flex justify-between items-center">
+                             <span className="text-blue-200 text-xs font-medium" title="Basado solo en usuarios que configuraron su tienda">Promedio/user activo:</span>
+                             <span className="text-lg font-bold">{kpis.planStats.pagados.configurados > 0 ? Math.round(kpis.planStats.pagados.ordenes / kpis.planStats.pagados.configurados) : 0}</span>
+                          </div>
+                        </div>
 
-                        if (item.desc) {
-                            qty = item.qty || 0;
-                            desc = item.desc;
-                            color = item.color || '';
-                            talla = item.talla || '';
-                            isGroupable = true;
-                        } else { 
-                            const match = item.description.match(/^(\d+)\s*x\s*(.*?)(?:\(|\s|$)/i);
-                            if (match && match[1] && match[2]) {
-                                qty = parseInt(match[1], 10);
-                                desc = match[2].trim();
-                                color = '';
-                                talla = '';
-                                isGroupable = true;
-                            } else {
-                                isGroupable = false;
-                                const key = item.description;
-                                if (groupedItems.has(key)) {
-                                    groupedItems.get(key).qty += 1;
-                                } else {
-                                    groupedItems.set(key, { isOld: true, description: item.description, qty: 1 });
-                                }
-                                qty = 1;
-                            }
-                        }
-                        totalPrendas += qty;
+                        {/* Tarjeta PRO Prueba */}
+                        <div className="bg-gradient-to-br from-indigo-800 to-purple-800 rounded-xl shadow-md p-6 border border-indigo-700 text-white flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-center gap-2 mb-4 border-b border-indigo-600 pb-3">
+                              <span className="text-2xl">⏳</span>
+                              <h3 className="font-bold text-lg">PRO (Prueba)</h3>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 mb-4">
+                               <div className="bg-white/10 p-3 rounded-lg backdrop-blur-sm border border-white/10">
+                                 <p className="text-indigo-200 text-[10px] uppercase font-bold tracking-wider">Adopción</p>
+                                 <p className="text-xl font-bold mt-1">{kpis.planStats.prueba.adopcion.toFixed(1)}%</p>
+                                 <p className="text-xs text-indigo-300 mt-1">{kpis.planStats.prueba.configurados}/{kpis.planStats.prueba.total} users</p>
+                               </div>
+                               <div className="bg-white/10 p-3 rounded-lg backdrop-blur-sm border border-white/10">
+                                 <p className="text-indigo-200 text-[10px] uppercase font-bold tracking-wider">Pedidos</p>
+                                 <p className="text-xl font-bold mt-1">{kpis.planStats.prueba.ordenes}</p>
+                                 <p className="text-xs text-indigo-300 mt-1">{kpis.planStats.prueba.porcentajeOrdenes.toFixed(1)}% del total</p>
+                               </div>
+                            </div>
+                          </div>
+                          <div className="bg-white/10 p-3 rounded-lg backdrop-blur-sm border border-white/10 flex justify-between items-center">
+                             <span className="text-indigo-200 text-xs font-medium" title="Basado solo en usuarios que configuraron su tienda">Promedio/user activo:</span>
+                             <span className="text-lg font-bold">{kpis.planStats.prueba.configurados > 0 ? Math.round(kpis.planStats.prueba.ordenes / kpis.planStats.prueba.configurados) : 0}</span>
+                          </div>
+                        </div>
 
-                        if (isGroupable) {
-                            const normalizedDesc = normalizeString(desc);
-                            const normalizedColor = normalizeString(color);
-                            const normalizedTalla = normalizeString(talla);
-                            const key = `${normalizedDesc}::${normalizedColor}::${normalizedTalla}`;
-                            const existing = groupedItems.get(key);
+                        {/* Tarjeta GRATIS (Usó Trial) */}
+                        <div className="bg-gradient-to-br from-stone-700 to-gray-900 rounded-xl shadow-md p-6 border border-gray-600 text-white flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-center gap-2 mb-4 border-b border-gray-600 pb-3">
+                              <span className="text-2xl">📉</span>
+                              <h3 className="font-bold text-lg" title="Usuarios que probaron y regresaron al plan Gratis">GRATIS (Trial Usado)</h3>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 mb-4">
+                               <div className="bg-white/10 p-3 rounded-lg backdrop-blur-sm border border-white/10">
+                                 <p className="text-gray-300 text-[10px] uppercase font-bold tracking-wider">Adopción</p>
+                                 <p className="text-xl font-bold mt-1">{kpis.planStats.gratisUsado.adopcion.toFixed(1)}%</p>
+                                 <p className="text-xs text-gray-400 mt-1">{kpis.planStats.gratisUsado.configurados}/{kpis.planStats.gratisUsado.total} users</p>
+                               </div>
+                               <div className="bg-white/10 p-3 rounded-lg backdrop-blur-sm border border-white/10">
+                                 <p className="text-gray-300 text-[10px] uppercase font-bold tracking-wider">Pedidos</p>
+                                 <p className="text-xl font-bold mt-1">{kpis.planStats.gratisUsado.ordenes}</p>
+                                 <p className="text-xs text-gray-400 mt-1">{kpis.planStats.gratisUsado.porcentajeOrdenes.toFixed(1)}% del total</p>
+                               </div>
+                            </div>
+                          </div>
+                          <div className="bg-white/10 p-3 rounded-lg backdrop-blur-sm border border-white/10 flex justify-between items-center">
+                             <span className="text-gray-300 text-xs font-medium" title="Basado solo en usuarios que configuraron su tienda">Promedio/user activo:</span>
+                             <span className="text-lg font-bold">{kpis.planStats.gratisUsado.configurados > 0 ? Math.round(kpis.planStats.gratisUsado.ordenes / kpis.planStats.gratisUsado.configurados) : 0}</span>
+                          </div>
+                        </div>
+
+                        {/* Tarjeta GRATIS (Nuevo / Sin Trial) */}
+                        <div className="bg-gradient-to-br from-emerald-800 to-teal-900 rounded-xl shadow-md p-6 border border-emerald-700 text-white flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-center gap-2 mb-4 border-b border-emerald-600 pb-3">
+                              <span className="text-2xl">🌱</span>
+                              <h3 className="font-bold text-lg" title="Nuevos usuarios que aún no activan su prueba gratis">GRATIS (Sin Trial)</h3>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 mb-4">
+                               <div className="bg-white/10 p-3 rounded-lg backdrop-blur-sm border border-white/10">
+                                 <p className="text-emerald-200 text-[10px] uppercase font-bold tracking-wider">Adopción</p>
+                                 <p className="text-xl font-bold mt-1">{kpis.planStats.gratisNuevo.adopcion.toFixed(1)}%</p>
+                                 <p className="text-xs text-emerald-300 mt-1">{kpis.planStats.gratisNuevo.configurados}/{kpis.planStats.gratisNuevo.total} users</p>
+                               </div>
+                               <div className="bg-white/10 p-3 rounded-lg backdrop-blur-sm border border-white/10">
+                                 <p className="text-emerald-200 text-[10px] uppercase font-bold tracking-wider">Pedidos</p>
+                                 <p className="text-xl font-bold mt-1">{kpis.planStats.gratisNuevo.ordenes}</p>
+                                 <p className="text-xs text-emerald-300 mt-1">{kpis.planStats.gratisNuevo.porcentajeOrdenes.toFixed(1)}% del total</p>
+                               </div>
+                            </div>
+                          </div>
+                          <div className="bg-white/10 p-3 rounded-lg backdrop-blur-sm border border-white/10 flex justify-between items-center">
+                             <span className="text-emerald-200 text-xs font-medium" title="Basado solo en usuarios que configuraron su tienda">Promedio/user activo:</span>
+                             <span className="text-lg font-bold">{kpis.planStats.gratisNuevo.configurados > 0 ? Math.round(kpis.planStats.gratisNuevo.ordenes / kpis.planStats.gratisNuevo.configurados) : 0}</span>
+                          </div>
+                        </div>
+
+                      </div>
+                    )}
+
+                    {/* Análisis Temporal (Mes y Día) */}
+                    {kpis.temporalStats && (
+                      <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mt-2 mb-4">
+                        <div className="flex items-center gap-2 mb-6 border-b pb-3">
+                          <Calendar className="w-6 h-6 text-indigo-500" />
+                          <h2 className="text-xl font-bold text-gray-800">Análisis Temporal de Pedidos</h2>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                          {/* Gráfico 1: Por Mes */}
+                          <div>
+                            <h3 className="font-semibold text-gray-700 mb-4 text-xs uppercase tracking-widest">Evolución por Mes</h3>
+                            <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
+                              {kpis.temporalStats.months.length === 0 ? <p className="text-sm text-gray-400">Sin datos</p> : null}
+                              {kpis.temporalStats.months.map(([month, count], i, arr) => {
+                                const max = Math.max(...arr.map(m => m[1])) || 1;
+                                const width = `${(count / max) * 100}%`;
+                                return (
+                                  <div key={month} className="group">
+                                    <div className="flex justify-between text-xs text-gray-600 mb-1 group-hover:text-indigo-600 transition-colors">
+                                      <span>{month}</span>
+                                      <span className="font-bold">{count}</span>
+                                    </div>
+                                    <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                                      <div className="bg-indigo-500 h-full rounded-full transition-all duration-500" style={{ width }}></div>
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Gráfico 2: Últimos Días */}
+                          <div>
+                            <h3 className="font-semibold text-gray-700 mb-4 text-xs uppercase tracking-widest">Últimos 7 Días</h3>
+                            <div className="space-y-3">
+                              {kpis.temporalStats.recentDates.length === 0 ? <p className="text-sm text-gray-400">Sin datos</p> : null}
+                              {kpis.temporalStats.recentDates.map(([date, count], i, arr) => {
+                                const max = Math.max(...arr.map(d => d[1])) || 1;
+                                const width = `${(count / max) * 100}%`;
+                                return (
+                                  <div key={date} className="group">
+                                    <div className="flex justify-between text-xs text-gray-600 mb-1 group-hover:text-blue-600 transition-colors">
+                                      <span>{date}</span>
+                                      <span className="font-bold">{count}</span>
+                                    </div>
+                                    <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                                      <div className="bg-blue-500 h-full rounded-full transition-all duration-500" style={{ width }}></div>
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Gráfico 3: Día de la Semana */}
+                          <div>
+                            <h3 className="font-semibold text-gray-700 mb-4 text-xs uppercase tracking-widest">Día de la Semana</h3>
+                            <div className="space-y-3">
+                              {kpis.temporalStats.daysOfWeek.map(({name, count}, i, arr) => {
+                                const max = Math.max(...arr.map(d => d.count)) || 1;
+                                const width = count > 0 ? `${(count / max) * 100}%` : '0%';
+                                return (
+                                  <div key={name} className="group">
+                                    <div className="flex justify-between text-xs text-gray-600 mb-1 group-hover:text-emerald-600 transition-colors">
+                                      <span>{name}</span>
+                                      <span className="font-bold">{count}</span>
+                                    </div>
+                                    <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                                      <div className="bg-emerald-500 h-full rounded-full transition-all duration-500" style={{ width }}></div>
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Gráfico 4: Por Hora (Horas Pico) */}
+                          <div>
+                            <h3 className="font-semibold text-gray-700 mb-4 text-xs uppercase tracking-widest">Horas Pico (Top)</h3>
+                            <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
+                              {kpis.temporalStats.peakHours.length === 0 ? <p className="text-sm text-gray-400">Sin datos</p> : null}
+                              {kpis.temporalStats.peakHours.map(({hour, count}, i, arr) => {
+                                const max = Math.max(...arr.map(h => h.count)) || 1;
+                                const width = `${(count / max) * 100}%`;
+                                return (
+                                  <div key={hour} className="group">
+                                    <div className="flex justify-between text-xs text-gray-600 mb-1 group-hover:text-purple-600 transition-colors">
+                                      <span>{hour}</span>
+                                      <span className="font-bold">{count}</span>
+                                    </div>
+                                    <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                                      <div className="bg-purple-500 h-full rounded-full transition-all duration-500" style={{ width }}></div>
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Directorio de Leads */}
+                    {kpis.leads && (kpis.leads.nuevos.length > 0 || kpis.leads.usados.length > 0) && (
+                      <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mt-2 mb-4">
+                         <div className="flex items-center gap-2 mb-6 border-b pb-3">
+                            <MessageCircle className="w-6 h-6 text-green-500" />
+                            <h2 className="text-xl font-bold text-gray-800">Directorio de Oportunidades (WhatsApp)</h2>
+                         </div>
+                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             
-                            if (existing) {
-                                existing.qty += qty;
-                            } else {
-                                groupedItems.set(key, { 
-                                    isOld: false, 
-                                    desc: desc,
-                                    qty: qty, 
-                                    color: color, 
-                                    talla: talla 
-                                });
-                            }
-                        }
-                    });
+                            {/* Tabla Gratis Nuevos */}
+                            <div className="border border-emerald-200 rounded-xl overflow-hidden flex flex-col h-[400px]">
+                               <div className="bg-emerald-50 text-emerald-800 font-bold p-4 border-b border-emerald-200 flex justify-between items-center shrink-0">
+                                 <div className="flex items-center gap-2">
+                                   <span className="text-xl">🌱</span> 
+                                   <span>Nuevos (Sin Trial)</span>
+                                 </div>
+                                 <span className="bg-emerald-200 text-emerald-900 py-1 px-3 rounded-full text-xs shadow-sm">{kpis.leads.nuevos.length} prospectos</span>
+                               </div>
+                               <div className="overflow-y-auto flex-1 p-0 bg-white">
+                                 <table className="w-full text-left text-sm">
+                                   <thead className="bg-emerald-50/50 sticky top-0 shadow-sm backdrop-blur-sm z-10">
+                                     <tr>
+                                       <th className="p-3 font-semibold text-gray-600 border-b border-emerald-100">Teléfono</th>
+                                       <th className="p-3 font-semibold text-gray-600 border-b border-emerald-100 text-center">Configuró</th>
+                                       <th className="p-3 font-semibold text-gray-600 border-b border-emerald-100 text-center">Pedidos</th>
+                                       <th className="p-3 font-semibold text-gray-600 border-b border-emerald-100 text-center">Acción</th>
+                                     </tr>
+                                   </thead>
+                                   <tbody className="divide-y divide-emerald-50">
+                                     {kpis.leads.nuevos.map(u => (
+                                        <tr key={u.id} className="hover:bg-emerald-50/50 transition-colors">
+                                           <td className="p-3 font-medium text-gray-800">{u.phone || 'Sin número'}</td>
+                                           <td className="p-3 text-center">{u.configurado ? '✅' : '❌'}</td>
+                                           <td className="p-3 text-center font-semibold text-gray-600">{u.ordenes}</td>
+                                           <td className="p-3 text-center">
+                                             {u.phone && (
+                                               <a href={`https://wa.me/51${String(u.phone).replace(/\D/g,'')}`} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-1.5 bg-[#25D366] text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-[#1ebd5c] transition-all shadow-sm hover:shadow active:scale-95">
+                                                 <MessageCircle className="w-3.5 h-3.5" /> Escribir
+                                               </a>
+                                             )}
+                                           </td>
+                                        </tr>
+                                     ))}
+                                     {kpis.leads.nuevos.length === 0 && (
+                                       <tr><td colSpan="4" className="p-8 text-center text-gray-400">No hay prospectos en esta categoría</td></tr>
+                                     )}
+                                   </tbody>
+                                 </table>
+                               </div>
+                            </div>
 
-                    // 2. Convertir a Array y Ordenar
-                    const itemsArray = Array.from(groupedItems.values());
-                    itemsArray.sort((a, b) => {
-                        const descA = a.desc || a.description || '';
-                        const descB = b.desc || b.description || '';
-                        return descA.localeCompare(descB);
-                    });
+                            {/* Tabla Gratis Usados */}
+                            <div className="border border-gray-200 rounded-xl overflow-hidden flex flex-col h-[400px]">
+                               <div className="bg-gray-100 text-gray-800 font-bold p-4 border-b border-gray-200 flex justify-between items-center shrink-0">
+                                 <div className="flex items-center gap-2">
+                                   <span className="text-xl">📉</span> 
+                                   <span>Usaron Trial (Recuperar)</span>
+                                 </div>
+                                 <span className="bg-gray-300 text-gray-900 py-1 px-3 rounded-full text-xs shadow-sm">{kpis.leads.usados.length} prospectos</span>
+                               </div>
+                               <div className="overflow-y-auto flex-1 p-0 bg-white">
+                                 <table className="w-full text-left text-sm">
+                                   <thead className="bg-gray-50 sticky top-0 shadow-sm backdrop-blur-sm z-10">
+                                     <tr>
+                                       <th className="p-3 font-semibold text-gray-600 border-b border-gray-200">Teléfono</th>
+                                       <th className="p-3 font-semibold text-gray-600 border-b border-gray-200 text-center">Configuró</th>
+                                       <th className="p-3 font-semibold text-gray-600 border-b border-gray-200 text-center">Pedidos</th>
+                                       <th className="p-3 font-semibold text-gray-600 border-b border-gray-200 text-center">Acción</th>
+                                     </tr>
+                                   </thead>
+                                   <tbody className="divide-y divide-gray-100">
+                                     {kpis.leads.usados.map(u => (
+                                        <tr key={u.id} className="hover:bg-gray-50 transition-colors">
+                                           <td className="p-3 font-medium text-gray-800">{u.phone || 'Sin número'}</td>
+                                           <td className="p-3 text-center">{u.configurado ? '✅' : '❌'}</td>
+                                           <td className="p-3 text-center font-semibold text-gray-600">{u.ordenes}</td>
+                                           <td className="p-3 text-center">
+                                             {u.phone && (
+                                               <a href={`https://wa.me/51${String(u.phone).replace(/\D/g,'')}`} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-1.5 bg-[#25D366] text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-[#1ebd5c] transition-all shadow-sm hover:shadow active:scale-95">
+                                                 <MessageCircle className="w-3.5 h-3.5" /> Escribir
+                                               </a>
+                                             )}
+                                           </td>
+                                        </tr>
+                                     ))}
+                                     {kpis.leads.usados.length === 0 && (
+                                       <tr><td colSpan="4" className="p-8 text-center text-gray-400">No hay prospectos en esta categoría</td></tr>
+                                     )}
+                                   </tbody>
+                                 </table>
+                               </div>
+                            </div>
 
-                    // 3. Construir el HTML
-                    let itemsHtml = '';
-                    for (const item of itemsArray) {
-                        if (item.isOld) {
-                            itemsHtml += `<li class="text-xs"></li>`;
-                        } else {
-                            let mainDesc = `<strong class="text-brand-text dark:text-brand-bg">${item.qty} x ${toProperCase(item.desc)}</strong>`;
-                            let attributes = [];
-                            if (item.color) {
-                                attributes.push(`color: ${item.color.toLowerCase()}`);
-                            }
-                            if (item.talla) {
-                                attributes.push(`talla: ${item.talla}`);
-                            }
-                            
-                            itemsHtml += `<li class="text-xs">${mainDesc}`;
-                            if (attributes.length > 0) {
-                                itemsHtml += ` <em class="text-brand-muted dark:text-gray-400">(${attributes.join(', ')})</em>`;
-                            }
-                            itemsHtml += `</li>`;
-                        }
-                    }
-                    // --- FIN DE LA NUEVA LÓGICA ---
+                         </div>
+                      </div>
+                    )}
 
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-brand-text dark:text-brand-bg">${shipment.clienteName}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-brand-muted dark:text-gray-400">
-                            <ul class="list-none space-y-1">${itemsHtml}</ul>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                            <!-- MODIFICADO: Botones con iconos -->
-                            <button 
-                              class="btn-copy-shipment p-2 inline-flex items-center justify-center rounded-md bg-blue-500 hover:bg-blue-600 text-white"
-                              title="Copiar Resumen"
-                              data-shipment-date="${shipment.fechaEnvio}"
-                              data-client-name="${shipment.clienteName}"
-                              data-items="${encodeURIComponent(itemsJson)}"
-                            >
-                              <i data-feather="copy" class="w-4 h-4"></i>
-                            </button>
-                            <button 
-                              class="btn-whatsapp-shipment p-2 inline-flex items-center justify-center rounded-md bg-green-500 hover:bg-green-600 text-white"
-                              title="Enviar por WhatsApp"
-                              data-shipment-date="${shipment.fechaEnvio}"
-                              data-client-name="${shipment.clienteName}"
-                              data-client-phone="${shipment.clienteName}" 
-                              data-items="${encodeURIComponent(itemsJson)}"
-                            >
-                              <i data-feather="send" class="w-4 h-4"></i>
-                            </button>
-                        </td>
-                    `;
-                    allShipmentsList.appendChild(tr);
-                });
-                // MUY IMPORTANTE: Volver a renderizar los iconos de Feather
-                if (typeof feather !== 'undefined') {
-                    feather.replace();
-                }
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                      {/* Top Merchants y Couriers */}
+                      <div className="lg:col-span-1 space-y-6">
+                        
+                        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                          <div className="flex items-center gap-2 mb-4 border-b pb-3">
+                            <Truck className="w-5 h-5 text-indigo-500" />
+                            <h3 className="font-bold text-gray-800">Top 3 Couriers</h3>
+                          </div>
+                          <div className="space-y-3">
+                            {kpis.topCouriers.map(([courier, count], i) => (
+                              <div key={i} className="flex justify-between items-center">
+                                <span className="text-gray-700 font-medium">{courier}</span>
+                                <span className="font-semibold bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-xs">{count} envíos</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
 
-            } catch(error) {
-                console.error("Error al cargar envíos (¡REVISA SI NECESITAS UN ÍNDICE!):", error);
-                allShipmentsList.innerHTML = `<tr><td colspan="3" class="px-6 py-4 text-center text-red-500">Error: ${error.message}. Es probable que necesites crear un índice en Firestore. Revisa la consola (F12).</td></tr>`;
-            }
+                        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                          <div className="flex items-center gap-2 mb-4 border-b pb-3">
+                            <Users className="w-5 h-5 text-blue-500" />
+                            <h3 className="font-bold text-gray-800">Top 5 Comercios</h3>
+                          </div>
+                          <div className="space-y-3">
+                            {kpis.topMerchants.map(([merchant, count], i) => (
+                              <div key={i} className="flex justify-between items-center group">
+                                <span className="text-gray-700 truncate w-2/3 group-hover:text-blue-600 transition-colors" title={merchant}>{merchant}</span>
+                                <span className="font-semibold bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs">{count} ped.</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                          <div className="flex items-center gap-2 mb-4 border-b pb-3">
+                            <FileText className="w-5 h-5 text-green-500" />
+                            <h3 className="font-bold text-gray-800">Suscripciones Globales</h3>
+                          </div>
+                          <div className="space-y-3">
+                            {Object.entries(kpis.usuarios.planes).map(([plan, count], i) => (
+                              <div key={i} className="flex justify-between items-center">
+                                <span className="text-gray-700 font-medium">{plan}</span>
+                                <span className="font-semibold bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs">{count} usuarios</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                      </div>
+
+                      {/* Insights Generados */}
+                      <div className="lg:col-span-2">
+                        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 h-full">
+                          <div className="flex items-center gap-2 mb-6 border-b pb-3">
+                            <Lightbulb className="w-6 h-6 text-yellow-500" />
+                            <h2 className="text-xl font-bold text-gray-800">Insights Estratégicos Automatizados</h2>
+                          </div>
+                          
+                          <div className="space-y-4">
+                            {kpis.insights.map((insight, index) => {
+                              let bgColor = "bg-gray-50 border-gray-200";
+                              let iconColor = "text-gray-500";
+                              let IconObj = Lightbulb;
+
+                              if (insight.type === 'warning') {
+                                bgColor = "bg-orange-50 border-orange-200";
+                                iconColor = "text-orange-500";
+                                IconObj = AlertCircle;
+                              } else if (insight.type === 'success') {
+                                bgColor = "bg-green-50 border-green-200";
+                                iconColor = "text-green-500";
+                                IconObj = CheckCircle;
+                              } else if (insight.type === 'info') {
+                                bgColor = "bg-blue-50 border-blue-200";
+                                iconColor = "text-blue-500";
+                                IconObj = BarChart2;
+                              } else if (insight.type === 'strategy') {
+                                bgColor = "bg-indigo-50 border-indigo-200";
+                                iconColor = "text-indigo-500";
+                                IconObj = Truck;
+                              }
+
+                              return (
+                                <div key={index} className={`p-4 rounded-xl border ${bgColor} flex gap-4 items-start hover:shadow-md transition-shadow`}>
+                                  <div className={`mt-1 ${iconColor} bg-white p-2 rounded-lg shadow-sm`}>
+                                    <IconObj className="w-5 h-5" />
+                                  </div>
+                                  <div>
+                                    <h4 className="font-bold text-gray-800 mb-1">{insight.title}</h4>
+                                    <p className="text-gray-700 text-sm leading-relaxed">{insight.text}</p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                  </div>
+                )}
+              </div>
+            </div>
+          );
         }
 
-        allShipmentsList.addEventListener('click', (e) => {
-            // Se usa .closest() para detectar el clic en el botón O en el icono <i> dentro de él
-            const wppButton = e.target.closest('.btn-whatsapp-shipment');
-            const copyButton = e.target.closest('.btn-copy-shipment');
-
-            if (wppButton) {
-                try {
-                    const clientName = wppButton.getAttribute('data-client-name');
-                    const clientPhone = wppButton.getAttribute('data-client-phone');
-                    const shipmentDate = wppButton.getAttribute('data-shipment-date');
-                    const items = JSON.parse(decodeURIComponent(wppButton.getAttribute('data-items')));
-                    
-                    generateShipmentWhatsAppSummary(clientName, clientPhone, shipmentDate, items);
-                } catch (error) {
-                    console.error("Error al parsear datos del envío:", error);
-                    showModal("Error", "No se pudieron cargar los datos para el resumen.");
-                }
-            }
-            
-            if (copyButton) {
-                try {
-                    const clientName = copyButton.getAttribute('data-client-name');
-                    const shipmentDate = copyButton.getAttribute('data-shipment-date');
-                    const items = JSON.parse(decodeURIComponent(copyButton.getAttribute('data-items')));
-                    
-                    // 1. Construir el mensaje
-                    const message = buildShipmentMessage(clientName, shipmentDate, items);
-                    // 2. Copiar al portapapeles
-                    copyTextToClipboard(message);
-
-                } catch (error) {
-                    console.error("Error al parsear datos para copiar:", error);
-                    showModal("Error", "No se pudieron cargar los datos para copiar.");
-                }
-            }
-        });
-        // --- FIN DE LÓGICA DE PESTAÑA DE ENVÍOS ---
-        
-        // --- NUEVO: LÓGICA DE LA PESTAÑA DE REPORTES ---
-        reportSearchBtn.addEventListener('click', async () => {
-            if (!isAuthReady) return;
-
-            const filterDate = reportDateFilter.value;
-            if (!filterDate) {
-                showModal("Error", "Por favor, seleccione una fecha para buscar.");
-                return;
-            }
-
-            reportResultsTbody.innerHTML = '<tr><td colspan="3" class="px-6 py-4 text-center text-brand-muted dark:text-gray-400">Generando reporte...</td></tr>';
-            reportResultsTotalRow.setAttribute('hidden', true);
-
-            try {
-                // 1. Consultar todos los items de ese día
-                const q = query(saleItemsCollection, where("date", "==", filterDate));
-                const querySnapshot = await getDocs(q);
-
-                if (querySnapshot.empty) {
-                    reportResultsTbody.innerHTML = '<tr><td colspan="3" class="px-6 py-4 text-center text-brand-muted dark:text-gray-400">No se encontraron ventas para esta fecha.</td></tr>';
-                    return;
-                }
-
-                // 2. Agrupar y sumar en el navegador
-                const totalsByPaymentMethod = new Map();
-                let grandTotal = 0;
-                let totalTransactions = 0;
-
-                querySnapshot.forEach(doc => {
-                    const item = doc.data();
-                    const method = item.medioDePago || 'Otro';
-                    
-                    const current = totalsByPaymentMethod.get(method) || { count: 0, total: 0 };
-                    
-                    current.count += 1;
-                    current.total += item.total;
-                    
-                    totalsByPaymentMethod.set(method, current);
-                    
-                    grandTotal += item.total;
-                    totalTransactions += 1; // Contar cada item
-                });
-
-                // 3. Renderizar los resultados
-                reportResultsTbody.innerHTML = '';
-                
-                totalsByPaymentMethod.forEach((data, method) => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-brand-text dark:text-brand-bg">${method}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-brand-muted dark:text-gray-400">${data.count}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-brand-muted dark:text-gray-400 text-right">${currencyFormatter.format(data.total)}</td>
-                    `;
-                    reportResultsTbody.appendChild(tr);
-                });
-
-                // 4. Renderizar totales
-                reportTotalTransactions.textContent = `${totalTransactions} (items)`;
-                reportGrandTotal.textContent = currencyFormatter.format(grandTotal);
-                reportResultsTotalRow.removeAttribute('hidden');
-
-            } catch (error) {
-                console.error("Error al generar reporte:", error);
-                reportResultsTbody.innerHTML = `<tr><td colspan="3" class="px-6 py-4 text-center text-red-500">Error: ${error.message}</td></tr>`;
-            }
-        });
-        // --- FIN DE LÓGICA DE REPORTES ---
-
-
-        // --- NUEVA FUNCIÓN: Construye el texto del mensaje ---
-        function buildShipmentMessage(clientName, shipmentDate, items) {
-            
-            // MODIFICADO: Emojis eliminados
-            let message = `*Compras incluidas en tu envío* 📦\n\n`;
-            let totalPrendas = 0;
-            const groupedItems = new Map();
-
-            // --- PASO 1: Parsear y Agrupar items ---
-            items.forEach(item => {
-                
-                let qty = 0;
-                let desc = '';
-                let color = '';
-                let talla = '';
-                let isGroupable = false;
-
-                // Verificar si es un item "nuevo" (con campos separados)
-                if (item.desc) {
-                    qty = item.qty || 0;
-                    desc = item.desc;
-                    color = item.color || '';
-                    talla = item.talla || '';
-                    isGroupable = true;
-                } else { 
-                    // Es un item "antiguo" (solo 'description')
-                    const match = item.description.match(/^(\d+)\s*x\s*(.*?)(?:\(|\s|$)/i);
-                    if (match && match[1] && match[2]) {
-                        qty = parseInt(match[1], 10);
-                        desc = match[2].trim();
-                        color = '';
-                        talla = '';
-                        isGroupable = true;
-                    } else {
-                        isGroupable = false;
-                        const key = item.description;
-                        if (groupedItems.has(key)) {
-                             groupedItems.get(key).qty += 1;
-                        } else {
-                             groupedItems.set(key, { isOld: true, description: item.description, qty: 1 });
-                        }
-                        qty = 1;
-                    }
-                }
-                totalPrendas += qty;
-
-                if (isGroupable) {
-                    const normalizedDesc = normalizeString(desc);
-                    const normalizedColor = normalizeString(color);
-                    const normalizedTalla = normalizeString(talla);
-                    const key = `${normalizedDesc}::${normalizedColor}::${normalizedTalla}`;
-                    const existing = groupedItems.get(key);
-                    
-                    if (existing) {
-                        existing.qty += qty;
-                    } else {
-                        groupedItems.set(key, { 
-                            isOld: false, 
-                            desc: desc, 
-                            qty: qty, 
-                            color: color, 
-                            talla: talla 
-                        });
-                    }
-                }
-            });
-
-            // --- PASO 2: Construir el mensaje a partir de los items agrupados ---
-            const itemsArray = Array.from(groupedItems.values());
-            itemsArray.sort((a, b) => {
-                const descA = a.desc || a.description || '';
-                const descB = b.desc || b.description || '';
-                return descA.localeCompare(descB);
-            });
-
-            for (const item of itemsArray) {
-                if (item.isOld) {
-                    message += `🌻 ${toProperCase(item.description)}\n\n`; // Emoji 🌻 -> •
-                } else {
-                    let mainDesc = `*${item.qty} x ${toProperCase(item.desc)}*`;
-                    let attributes = [];
-                    if (item.color) {
-                        attributes.push(`color: ${item.color.toLowerCase()}`);
-                    }
-                    if (item.talla) {
-                        attributes.push(`talla: ${item.talla}`);
-                    }
-                    
-                    message += `🌻 ${mainDesc}`; // Emoji 🌻 -> •
-                    if (attributes.length > 0) {
-                        message += ` _(${attributes.join(', ')})_`;
-                    }
-                    message += `\n\n`;
-                }
-            }
-
-            message += `✅ *Total de prendas: ${totalPrendas}*\n\n`; // Emoji ✅ eliminado
-            message += `_Atte. CompliCompras_ 🛍️`; // Emoji 🛍️ eliminado
-
-            return message;
-        }
-
-        // --- FUNCIÓN DE WHATSAPP POR ENVÍO (AHORA REFACTORIZADA) ---
-        function generateShipmentWhatsAppSummary(clientName, clientPhone, shipmentDate, items) {
-            if (!clientName || !clientPhone || !items) {
-                showModal("Error", "Faltan datos del cliente o del envío.");
-                return;
-            }
-
-            // 1. Construir el mensaje
-            const message = buildShipmentMessage(clientName, shipmentDate, items);
-
-            // 2. Encodear y enviar
-            const encodedMessage = encodeURIComponent(message);
-            
-            if (clientPhone.length < 8) {
-                showModal("Error", `El número de teléfono "${clientPhone}" no parece válido.`);
-                return;
-            }
-            const whatsappUrl = `https://wa.me/${clientPhone}?text=${encodedMessage}`;
-            window.open(whatsappUrl, '_blank');
-        }
-        
+        // ==========================================
+        // RENDER DE LA APLICACIÓN
+        // ==========================================
+        const rootElement = document.getElementById('root');
+        const root = ReactDOM.createRoot(rootElement);
+        root.render(<DashboardB2B />);
     </script>
 </body>
 </html>
