@@ -66,6 +66,8 @@
         const MessageCircle = ({className}) => <IconWrapper className={className}><path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"/></IconWrapper>;
         const Flame = ({className}) => <IconWrapper className={className}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></IconWrapper>;
         const Star = ({className}) => <IconWrapper className={className}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></IconWrapper>;
+        const SearchIcon = ({className}) => <IconWrapper className={className}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></IconWrapper>;
+        const Database = ({className}) => <IconWrapper className={className}><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></IconWrapper>;
 
         // ==========================================
         // COMPONENTE: GRÁFICO REUTILIZABLE (Chart.js)
@@ -116,6 +118,16 @@
           return null;
         };
 
+        // SOLUCIÓN AL ERROR DE FECHAS: Formateo 100% seguro a string
+        const formatSafeDateString = (val) => {
+          if (!val) return '';
+          const d = parseSafeDate(val);
+          if (d) {
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          }
+          return String(val).substring(0, 10);
+        };
+
         // ==========================================
         // COMPONENTE PRINCIPAL
         // ==========================================
@@ -124,6 +136,10 @@
           const [kpis, setKpis] = useState(null);
           const [loading, setLoading] = useState(false);
           const [error, setError] = useState('');
+          
+          // ESTADOS PARA BÚSQUEDA CRM
+          const [searchTerm, setSearchTerm] = useState('');
+          const [searchedData, setSearchedData] = useState(null);
 
           const handleFileChange = (e) => {
             setExcelFile(e.target.files[0]);
@@ -209,10 +225,12 @@
                   // 2. Mapeo de Configuraciones
                   const configUnicosSet = new Set();
                   const merchantNames = {};
+                  const configDict = {}; // Diccionario rápido para el buscador
                   
                   configData.forEach(c => {
                     configUnicosSet.add(c.MerchantID);
                     const jsonData = safeJSONParse(c.DataJSON);
+                    configDict[c.MerchantID] = jsonData;
                     const mName = jsonData.merchantName || c.MerchantID;
                     merchantNames[c.MerchantID] = mName;
                     
@@ -225,6 +243,9 @@
                   const totalUsuarios = usersData.length;
                   const configUnicos = configUnicosSet.size;
                   const tasaAdopcion = totalUsuarios > 0 ? (configUnicos / totalUsuarios) * 100 : 0;
+                  // Nuevo KPI: Porcentaje de usuarios Pro (Estricto, sin pruebas)
+                  const totalProUsers = proPagadosIDs.size;
+                  const pctProUsers = totalUsuarios > 0 ? (totalProUsers / totalUsuarios) * 100 : 0;
 
                   // 3. Mapeo de Órdenes
                   const todasOrdenes = [...ordersData, ...backlogData];
@@ -235,6 +256,7 @@
                   const couriersCount = {};
                   const merchantOrdersCount = {}; 
                   const merchantMonthlyOrders = {}; // Para el gráfico del Top 5
+                  let proOrdersCount = 0; // Para el nuevo KPI de Tasa de Cumplimiento
 
                   const ordersByMonth = {};
                   const ordersByDate = {};
@@ -247,7 +269,13 @@
                     
                     const mId = o.MerchantID || o.UID;
                     merchantOrdersCount[mId] = (merchantOrdersCount[mId] || 0) + 1;
-                    if (usersMap[mId]) usersMap[mId].ordenes++;
+                    if (usersMap[mId]) {
+                        usersMap[mId].ordenes++;
+                        // Contar si la orden es de un usuario PRO (Estricto, sin contar pruebas)
+                        if (proPagadosIDs.has(mId)) {
+                            proOrdersCount++;
+                        }
+                    }
 
                     const rawDate = o.Date || o.date || o.DATE || o.Fecha || o.fecha || o.FECHA || o.CreatedAt;
                     const dateObj = parseSafeDate(rawDate);
@@ -285,11 +313,13 @@
                       return acc;
                   }, 0);
                   const pctShalom = totalOrdenes > 0 ? (shalomCount / totalOrdenes) * 100 : 0;
+                  const pctProOrders = totalOrdenes > 0 ? (proOrdersCount / totalOrdenes) * 100 : 0;
                   
                   const proMerchantsArray = [];
                   Object.keys(merchantOrdersCount).forEach(mId => {
                       const u = usersMap[mId];
-                      if (u && u.plan.toLowerCase().includes('pro')) {
+                      // Solo consideramos a los usuarios estrictamente en plan "Pro"
+                      if (u && proPagadosIDs.has(mId)) {
                           proMerchantsArray.push({
                               id: mId,
                               name: u.name || merchantNames[mId] || mId,
@@ -298,8 +328,10 @@
                           });
                       }
                   });
-                  const topProMerchants = proMerchantsArray.sort((a,b) => b.count - a.count).slice(0, 5);
-
+                  
+                  const sortedProMerchants = proMerchantsArray.sort((a,b) => b.count - a.count);
+                  const topProMerchants = sortedProMerchants.slice(0, 5);
+                  const otherProMerchants = sortedProMerchants.slice(5);
 
                   // 5. CÁLCULO DE GRÁFICOS (USERS ACUMULADOS Y PEDIDOS MENSUALES POR PLAN)
                   const allMonthsSet = new Set();
@@ -313,35 +345,23 @@
                   });
                   
                   const allMonths = Array.from(allMonthsSet).sort();
-                  
-                  // NUEVO: Filtramos el eje X para que solo aparezcan los meses donde hubo pedidos globales
+
+                  // Filtramos el eje X para que solo aparezcan los meses donde hubo pedidos globales
                   const orderMonthsSet = new Set();
                   todasOrdenes.forEach(o => {
                       const d = parseSafeDate(o.Date || o.date || o.Fecha || o.CreatedAt);
                       if (d) orderMonthsSet.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
                   });
                   const orderMonths = Array.from(orderMonthsSet).sort();
-
-                  // Generar Data para el Chart de los Top 5 Comercios
-                  const chartColors = ['#3b82f6', '#10b981', '#f59e0b', '#6366f1', '#ec4899']; // Blue, Emerald, Amber, Indigo, Pink
-                  const top5MonthlyData = topProMerchants.map((merchant, index) => {
-                      let acc = 0;
+                  
+                  // Generar Data para el Chart de los Top 5 Comercios (No acumulado)
+                  const chartColors = ['#3b82f6', '#10b981', '#f59e0b', '#6366f1', '#ec4899']; 
+                  const proMerchantsMonthlyData = topProMerchants.map((merchant, index) => {
                       const createdMonth = usersMap[merchant.id]?.createdAtMonth;
                       
-                      // Acumulamos secuencialmente por TODOS los meses para no perder la suma real matemática
-                      const allDataByMonth = {};
-                      allMonths.forEach(m => {
-                          acc += (merchantMonthlyOrders[merchant.id] && merchantMonthlyOrders[merchant.id][m]) || 0;
-                          allDataByMonth[m] = acc;
-                      });
-
-                      // Filtramos la data final mapeando solo los meses con pedidos (orderMonths)
                       const data = orderMonths.map(m => {
-                          // Si el mes analizado es anterior a la fecha de creación del comercio, devolvemos null (no dibuja línea)
-                          if (createdMonth && m < createdMonth) {
-                              return null; 
-                          }
-                          return allDataByMonth[m];
+                          if (createdMonth && m < createdMonth) return null; 
+                          return (merchantMonthlyOrders[merchant.id] && merchantMonthlyOrders[merchant.id][m]) || 0;
                       });
                       
                       return {
@@ -351,11 +371,41 @@
                           backgroundColor: chartColors[index % chartColors.length],
                           tension: 0.3,
                           borderWidth: 2,
-                          pointRadius: 2,
+                          pointRadius: 3,
                           fill: false,
-                          spanGaps: true // Conecta los puntos visualmente si hay meses intermedios con 0 pedidos
+                          spanGaps: true
                       };
                   });
+
+                  // Agregar "Otros PRO"
+                  if (otherProMerchants.length > 0) {
+                      const othersData = orderMonths.map(m => {
+                          let monthSum = 0;
+                          let activeCount = 0;
+                          
+                          otherProMerchants.forEach(merchant => {
+                              const createdMonth = usersMap[merchant.id]?.createdAtMonth;
+                              if (!createdMonth || m >= createdMonth) {
+                                  activeCount++;
+                                  monthSum += (merchantMonthlyOrders[merchant.id] && merchantMonthlyOrders[merchant.id][m]) || 0;
+                              }
+                          });
+                          return activeCount > 0 ? parseFloat((monthSum / activeCount).toFixed(1)) : null;
+                      });
+
+                      proMerchantsMonthlyData.push({
+                          label: `Promedio Otros PRO (${otherProMerchants.length} comercios)`,
+                          data: othersData,
+                          borderColor: '#94a3b8',
+                          backgroundColor: '#94a3b8',
+                          borderDash: [5, 5],
+                          tension: 0.3,
+                          borderWidth: 2,
+                          pointRadius: 2,
+                          fill: false,
+                          spanGaps: true
+                      });
+                  }
 
                   const usersTimeline = {};
                   const ordersTimeline = {};
@@ -392,7 +442,6 @@
                   const allCumUsersData = { pagados: {}, prueba: {}, gratisUsado: {}, gratisNuevo: {} };
                   const allOrderTrendData = { pagados: {}, prueba: {}, gratisUsado: {}, gratisNuevo: {} };
 
-                  // Acumulamos en todos los meses para no romper la matemática base
                   allMonths.forEach(m => {
                       accPagados += usersTimeline[m].pagados;
                       accPrueba += usersTimeline[m].prueba;
@@ -410,7 +459,6 @@
                       allOrderTrendData.gratisNuevo[m] = ordersTimeline[m].gratisNuevo;
                   });
 
-                  // Extraemos solo los meses válidos (orderMonths) para las gráficas
                   const cumUsersData = {
                       pagados: orderMonths.map(m => allCumUsersData.pagados[m]),
                       prueba: orderMonths.map(m => allCumUsersData.prueba[m]),
@@ -434,7 +482,7 @@
                   const formattedDaysOfWeek = daysMap.map((name, idx) => ({ name, count: ordersByDayOfWeek[idx] }));
                   const sortedHoursDesc = ordersByHour.map((count, hour) => ({ hour: `${String(hour).padStart(2, '0')}:00`, count })).filter(h => h.count > 0).sort((a, b) => b.count - a.count); 
 
-                  // 6. CLASIFICACIÓN DE LEADS (Lead Scoring y Temperatura)
+                  // 6. CLASIFICACIÓN DE LEADS
                   const classifyLead = (u) => {
                      if (u.configurado && u.ordenes > 0) return { label: '🔥 Caliente', color: 'text-red-600 bg-red-100 border-red-200', score: 3 };
                      if (u.configurado || u.ordenes > 0) return { label: '⚡ Tibio', color: 'text-amber-600 bg-amber-100 border-amber-200', score: 2 };
@@ -444,41 +492,30 @@
                   const targetLeads = Object.values(usersMap).filter(u => u.plan === 'Gratis');
                   const mappedLeads = targetLeads.map(u => ({ ...u, tempClass: classifyLead(u) }));
                   
-                  // Ordenamos primero por Score (Caliente -> Frío), luego por cantidad de órdenes
                   const leadsUsados = mappedLeads.filter(u => u.hasUsedTrial).sort((a, b) => b.tempClass.score - a.tempClass.score || b.ordenes - a.ordenes);
                   const leadsNuevos = mappedLeads.filter(u => !u.hasUsedTrial).sort((a, b) => b.tempClass.score - a.tempClass.score || b.ordenes - a.ordenes);
 
                   const insights = [];
                   
-                  if (gratisNuevoIDs.size > 0) {
-                    insights.push({ type: 'info', title: 'Oportunidad de Trial', text: `Hay ${gratisNuevoIDs.size} usuarios en plan 'Gratis' que AÚN NO usan su prueba. Inicia una campaña automatizada para engancharlos.` });
-                  }
-                  if (gratisUsadoIDs.size > 0) {
-                     insights.push({ type: 'warning', title: 'Recuperación de Usuarios', text: `Hay ${gratisUsadoIDs.size} usuarios que usaron su prueba pero no pagaron (Downgrade). Ofrece un descuento especial para recuperarlos.` });
-                  }
+                  if (gratisNuevoIDs.size > 0) insights.push({ type: 'info', title: 'Oportunidad de Trial', text: `Hay ${gratisNuevoIDs.size} usuarios en plan 'Gratis' que AÚN NO usan su prueba. Inicia una campaña automatizada para engancharlos.` });
+                  if (gratisUsadoIDs.size > 0) insights.push({ type: 'warning', title: 'Recuperación de Usuarios', text: `Hay ${gratisUsadoIDs.size} usuarios que usaron su prueba pero no pagaron (Downgrade). Ofrece un descuento especial para recuperarlos.` });
                   const tasaPendientes = totalOrdenes > 0 ? (pendientes / totalOrdenes) * 100 : 0;
-                  if (tasaPendientes > 20) {
-                    insights.push({ type: 'warning', title: 'Cuello de Botella', text: `El ${tasaPendientes.toFixed(1)}% de las órdenes están 'PENDIENTES'. Revisa si es por falta de stock o actualización de estados.` });
-                  }
-                  if (topCouriers.length > 0) {
-                    insights.push({ type: 'strategy', title: `Dominancia de ${topCouriers[0][0]}`, text: `Al ser el courier dominante, considera desarrollar una integración API directa con ellos para generar guías automáticamente.` });
-                  }
-                  if (sortedHoursDesc.length > 0) {
-                    insights.push({ type: 'success', title: `Hora Pico: ${sortedHoursDesc[0].hour} ⏰`, text: `El mayor volumen de actividad ocurre a las ${sortedHoursDesc[0].hour}. Es el momento ideal para lanzar comunicados importantes.` });
-                  }
+                  if (tasaPendientes > 20) insights.push({ type: 'warning', title: 'Cuello de Botella', text: `El ${tasaPendientes.toFixed(1)}% de las órdenes están 'PENDIENTES'. Revisa si es por falta de stock o actualización de estados.` });
+                  if (topCouriers.length > 0) insights.push({ type: 'strategy', title: `Dominancia de ${topCouriers[0][0]}`, text: `Al ser el courier dominante, considera desarrollar una integración API directa con ellos para generar guías automáticamente.` });
+                  if (sortedHoursDesc.length > 0) insights.push({ type: 'success', title: `Hora Pico: ${sortedHoursDesc[0].hour} ⏰`, text: `El mayor volumen de actividad ocurre a las ${sortedHoursDesc[0].hour}. Es el momento ideal para lanzar comunicados importantes.` });
 
                   setKpis({
-                    usuarios: { total: totalUsuarios, planes, activos: configUnicos, tasaAdopcion },
-                    operaciones: { total: totalOrdenes, pctShalom, enviadas, tasaCumplimiento },
+                    usuarios: { total: totalUsuarios, planes, activos: configUnicos, tasaAdopcion, pctProUsers },
+                    operaciones: { total: totalOrdenes, pctShalom, enviadas, tasaCumplimiento, pctProOrders },
                     topCouriers,
                     topProMerchants,
                     insights,
                     topProMerchantsChart: {
-                        labels: allMonths,
-                        datasets: top5MonthlyData
+                        labels: orderMonths,
+                        datasets: proMerchantsMonthlyData
                     },
                     planTrends: { 
-                      labels: allMonths,
+                      labels: orderMonths,
                       users: cumUsersData,
                       orders: orderTrendData
                     },
@@ -491,6 +528,11 @@
                     leads: {
                       nuevos: leadsNuevos,
                       usados: leadsUsados
+                    },
+                    raw: { // GUARDAMOS DATA CRUDA PARA EL BUSCADOR CRM
+                      usersMap,
+                      configDict,
+                      orders: todasOrdenes
                     }
                   });
                   
@@ -520,6 +562,98 @@
             setExcelFile(null);
             setKpis(null);
             setError('');
+            setSearchTerm('');
+            setSearchedData(null);
+          };
+
+          // FUNCIÓN DEL BUSCADOR CRM CON GENERACIÓN DE GRÁFICO
+          const handleSearch = (e) => {
+              const term = e.target.value;
+              setSearchTerm(term);
+              
+              if (!term || term.trim().length < 3) {
+                  setSearchedData(null);
+                  return;
+              }
+
+              const termClean = term.replace(/\D/g, ''); 
+              if (termClean.length < 3) {
+                  setSearchedData(null);
+                  return;
+              }
+
+              if (kpis && kpis.raw) {
+                  const matchedUID = Object.keys(kpis.raw.usersMap).find(uid => {
+                      const p = kpis.raw.usersMap[uid].phone || '';
+                      return p.replace(/\D/g, '').includes(termClean);
+                  });
+
+                  if (matchedUID) {
+                      const u = kpis.raw.usersMap[matchedUID];
+                      const c = kpis.raw.configDict[matchedUID];
+                      const o = kpis.raw.orders.filter(ord => (ord.MerchantID || ord.UID) === matchedUID);
+                      
+                      // 1. Ordenamos los pedidos por fecha descendente para la tabla
+                      o.sort((a,b) => {
+                          const da = parseSafeDate(a.Date || a.date || a.CreatedAt) || new Date(0);
+                          const db = parseSafeDate(b.Date || b.date || b.CreatedAt) || new Date(0);
+                          return db - da;
+                      });
+
+                      // 2. GENERAR DATA PARA EL GRÁFICO (Couriers por mes)
+                      const userOrdersByMonthAndCourier = {};
+                      const userCouriers = new Set();
+                      const userMonths = new Set();
+
+                      o.forEach(ord => {
+                          const rawDate = ord.Date || ord.date || ord.CreatedAt;
+                          const d = parseSafeDate(rawDate);
+                          if (d) {
+                              const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                              userMonths.add(monthKey);
+                              
+                              const jsonData = safeJSONParse(ord.DataJSON);
+                              const courier = jsonData.courier || 'Desconocido';
+                              userCouriers.add(courier);
+
+                              if (!userOrdersByMonthAndCourier[monthKey]) {
+                                  userOrdersByMonthAndCourier[monthKey] = {};
+                              }
+                              userOrdersByMonthAndCourier[monthKey][courier] = (userOrdersByMonthAndCourier[monthKey][courier] || 0) + 1;
+                          }
+                      });
+
+                      const sortedUserMonths = Array.from(userMonths).sort();
+                      const courierList = Array.from(userCouriers);
+                      const userChartColors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#f43f5e'];
+
+                      const userChartDatasets = courierList.map((courier, i) => {
+                          const data = sortedUserMonths.map(m => {
+                              return (userOrdersByMonthAndCourier[m] && userOrdersByMonthAndCourier[m][courier]) || 0;
+                          });
+                          return {
+                              label: courier,
+                              data: data,
+                              backgroundColor: userChartColors[i % userChartColors.length],
+                              borderColor: userChartColors[i % userChartColors.length],
+                              borderWidth: 2,
+                              tension: 0.3,
+                              fill: false,
+                              pointRadius: 3,
+                              spanGaps: true
+                          };
+                      });
+
+                      setSearchedData({ 
+                        user: u, 
+                        config: c, 
+                        orders: o, 
+                        chartData: { labels: sortedUserMonths, datasets: userChartDatasets } 
+                      });
+                  } else {
+                      setSearchedData('NOT_FOUND');
+                  }
+              }
           };
 
           const StatCard = ({ title, value, subtitle, icon: Icon, colorClass }) => (
@@ -610,7 +744,7 @@
                       <StatCard 
                         title="Total Usuarios" 
                         value={kpis.usuarios.total} 
-                        subtitle={`${kpis.usuarios.activos} con tienda configurada`}
+                        subtitle={`${kpis.usuarios.pctProUsers.toFixed(1)}% de usuarios son PRO`}
                         icon={Users} 
                         colorClass="bg-blue-100 text-blue-600"
                       />
@@ -629,12 +763,170 @@
                         colorClass="bg-green-100 text-green-600"
                       />
                       <StatCard 
-                        title="Tasa Cumplimiento" 
-                        value={`${kpis.operaciones.tasaCumplimiento.toFixed(1)}%`} 
-                        subtitle="Pedidos en estado ENVIADO"
+                        title="Órdenes PRO" 
+                        value={`${kpis.operaciones.pctProOrders.toFixed(1)}%`} 
+                        subtitle="Pedidos provenientes de usuarios PRO"
                         icon={CheckCircle} 
                         colorClass="bg-yellow-100 text-yellow-600"
                       />
+                    </div>
+
+                    {/* NUEVA SECCIÓN: Buscador CRM */}
+                    <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mt-6">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b pb-4">
+                            <div className="flex items-center gap-2">
+                                <SearchIcon className="w-6 h-6 text-indigo-500" />
+                                <h3 className="font-bold text-gray-800 text-lg">Buscador CRM de Clientes</h3>
+                            </div>
+                            <div className="relative w-full md:w-1/2">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <SearchIcon className="w-4 h-4 text-gray-400" />
+                                </div>
+                                <input
+                                    type="text"
+                                    placeholder="Buscar por celular (ej. 981391159)..."
+                                    className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50 focus:bg-white transition-colors"
+                                    value={searchTerm}
+                                    onChange={handleSearch}
+                                />
+                            </div>
+                        </div>
+
+                        {searchTerm.length >= 3 && searchedData === 'NOT_FOUND' && (
+                            <div className="text-center py-8">
+                                <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                                <p className="text-gray-500 font-medium">No se encontró ningún comercio con ese número de teléfono.</p>
+                            </div>
+                        )}
+
+                        {searchedData && searchedData !== 'NOT_FOUND' && (
+                            <div className="animate-fade-in-up">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                                    {/* Perfil */}
+                                    <div className="bg-blue-50/50 rounded-xl p-4 border border-blue-100">
+                                        <h4 className="font-bold text-blue-800 mb-3 flex items-center gap-2"><Users className="w-4 h-4"/> Perfil del Comercio</h4>
+                                        <div className="space-y-2 text-sm text-gray-700">
+                                            <p><span className="font-semibold text-gray-500">Teléfono:</span> {searchedData.user.phone || 'N/A'}</p>
+                                            <p><span className="font-semibold text-gray-500">Plan:</span> <span className="font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded">{searchedData.user.plan}</span></p>
+                                            <p><span className="font-semibold text-gray-500">¿Usó Trial?:</span> {searchedData.user.hasUsedTrial ? 'Sí' : 'No'}</p>
+                                            <p><span className="font-semibold text-gray-500">ID Único:</span> <span className="text-[10px] break-all text-gray-400 font-mono">{searchedData.user.id}</span></p>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Configuración */}
+                                    <div className="bg-purple-50/50 rounded-xl p-4 border border-purple-100">
+                                        <h4 className="font-bold text-purple-800 mb-3 flex items-center gap-2"><Database className="w-4 h-4"/> Config. Tienda</h4>
+                                        <div className="space-y-2 text-sm text-gray-700">
+                                            <p><span className="font-semibold text-gray-500">Nombre:</span> <span className="font-bold">{searchedData.user.name || 'Sin nombre / No Configurado'}</span></p>
+                                            <p><span className="font-semibold text-gray-500">Couriers Activos:</span> {searchedData.config?.couriers?.join(', ') || 'N/A'}</p>
+                                            <p><span className="font-semibold text-gray-500">Días Envío:</span> {searchedData.config?.shippingDays?.join(', ') || 'N/A'}</p>
+                                            <p><span className="font-semibold text-gray-500">Corte Horario:</span> {searchedData.config?.updateTime || 'N/A'}</p>
+                                            <p><span className="font-semibold text-gray-500">Días de Anticipación:</span> <span className="font-semibold text-purple-700">{searchedData.config?.updateGap !== undefined ? `${searchedData.config.updateGap} día(s)` : 'N/A'}</span></p>
+                                        </div>
+                                    </div>
+
+                                    {/* Actividad y Couriers */}
+                                    <div className="bg-green-50/50 rounded-xl p-4 border border-green-100 flex flex-col justify-between">
+                                        <div>
+                                            <h4 className="font-bold text-green-800 mb-3 flex items-center gap-2"><Package className="w-4 h-4"/> Resumen Actividad</h4>
+                                            <div className="space-y-2 text-sm text-gray-700">
+                                                <p><span className="font-semibold text-gray-500">Total Pedidos:</span> <span className="text-lg font-bold text-green-700">{searchedData.orders.length}</span></p>
+                                                <div className="flex gap-4">
+                                                    <p><span className="font-semibold text-gray-500">Éxito:</span> {searchedData.orders.filter(o => o.Status === 'ENVIADO').length}</p>
+                                                    <p><span className="font-semibold text-gray-500">Cola:</span> {searchedData.orders.filter(o => o.Status === 'PENDIENTE').length}</p>
+                                                </div>
+                                                <p><span className="font-semibold text-gray-500">Último:</span> {searchedData.orders[0] ? formatSafeDateString(searchedData.orders[0].Date || searchedData.orders[0].date || searchedData.orders[0].CreatedAt) : 'Nunca'}</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="mt-3 pt-3 border-t border-green-200">
+                                            <p className="font-semibold text-green-800 text-xs uppercase mb-2">Uso de Couriers</p>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {searchedData.orders.length > 0 ? (
+                                                    Object.entries(searchedData.orders.reduce((acc, o) => {
+                                                        const d = safeJSONParse(o.DataJSON);
+                                                        const c = d.courier || 'Desconocido';
+                                                        acc[c] = (acc[c] || 0) + 1;
+                                                        return acc;
+                                                    }, {})).sort((a,b) => b[1]-a[1]).map(([c, count]) => (
+                                                        <span key={c} className="bg-white border border-green-200 text-green-700 px-2 py-0.5 rounded text-[11px] font-bold shadow-sm">
+                                                            {c}: {count}
+                                                        </span>
+                                                    ))
+                                                ) : (
+                                                    <span className="text-gray-400 text-xs">Sin registros</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Gráfico CRM (Couriers x Mes) */}
+                                {searchedData.orders.length > 0 && searchedData.chartData && (
+                                    <div className="border border-gray-200 rounded-xl overflow-hidden mb-6 p-6 bg-white shadow-sm">
+                                        <div className="flex items-center gap-2 mb-4 border-b pb-2">
+                                            <BarChart2 className="w-5 h-5 text-indigo-500" />
+                                            <h4 className="font-bold text-gray-700 text-base">Evolución de Envíos por Courier</h4>
+                                        </div>
+                                        <div className="relative h-[250px] w-full">
+                                            <ChartComponent 
+                                                type="line" 
+                                                data={searchedData.chartData} 
+                                                options={{ 
+                                                    responsive: true, 
+                                                    maintainAspectRatio: false, 
+                                                    plugins: { legend: { position: 'top' } }, 
+                                                    scales: { 
+                                                        x: { grid: { display: false } }, 
+                                                        y: { beginAtZero: true } 
+                                                    } 
+                                                }} 
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Tabla Últimos Pedidos */}
+                                {searchedData.orders.length > 0 && (
+                                    <div className="border border-gray-200 rounded-xl overflow-hidden">
+                                        <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                                            <h4 className="font-bold text-gray-700 text-sm">Registro de Pedidos ({Math.min(searchedData.orders.length, 10)} más recientes)</h4>
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left text-sm whitespace-nowrap">
+                                                <thead className="bg-white text-gray-500 border-b border-gray-200">
+                                                    <tr>
+                                                        <th className="p-3 font-semibold">Fecha y Hora</th>
+                                                        <th className="p-3 font-semibold">Cliente Final (Comprador)</th>
+                                                        <th className="p-3 font-semibold">Tel. Comprador</th>
+                                                        <th className="p-3 font-semibold">Courier Seleccionado</th>
+                                                        <th className="p-3 font-semibold">Estado</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-100 bg-white">
+                                                    {searchedData.orders.slice(0, 10).map((o, i) => {
+                                                        const d = safeJSONParse(o.DataJSON);
+                                                        return (
+                                                            <tr key={i} className="hover:bg-gray-50">
+                                                                <td className="p-3 text-gray-600">{formatSafeDateString(o.Date || o.date || o.CreatedAt)}</td>
+                                                                <td className="p-3 font-medium text-gray-800">{o.ClientName || d.clientName || 'N/A'}</td>
+                                                                <td className="p-3 text-gray-500">{d.clientPhone || 'N/A'}</td>
+                                                                <td className="p-3 text-gray-600">{d.courier || 'N/A'}</td>
+                                                                <td className="p-3">
+                                                                    <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${o.Status === 'ENVIADO' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                                                        {o.Status}
+                                                                    </span>
+                                                                </td>
+                                                            </tr>
+                                                        )
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
@@ -699,7 +991,7 @@
                     <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mt-6 mb-6">
                         <div className="flex items-center gap-2 mb-4 border-b pb-3">
                             <Star className="w-6 h-6 text-amber-500" />
-                            <h3 className="font-bold text-gray-800 text-lg">Top 5 Comercios (Solo PRO) - Evolución de Pedidos</h3>
+                            <h3 className="font-bold text-gray-800 text-lg">Rendimiento de Comercios PRO (Top 5 vs Resto)</h3>
                         </div>
                         
                         <div className="relative h-[300px] w-full mt-4">
@@ -709,7 +1001,9 @@
                                 options={{ 
                                     responsive: true, 
                                     maintainAspectRatio: false, 
-                                    plugins: { legend: { display: false } }, 
+                                    plugins: { 
+                                        legend: { display: true, position: 'top', labels: { boxWidth: 12, usePointStyle: true } } 
+                                    }, 
                                     scales: { 
                                         x: { display: true, grid: { display: false } }, 
                                         y: { beginAtZero: true } 
