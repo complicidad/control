@@ -19,6 +19,9 @@
     <!-- Chart.js para Gráficos -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+    <!-- SheetJS (Para leer Excel y CSV) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
     <style>
         body { font-family: "Quicksand", system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; }
         [hidden] { display: none !important; }
@@ -74,7 +77,7 @@
 </head>
 <body class="bg-brand-bg text-brand-text dark:bg-gray-900 dark:text-gray-100 transition-colors duration-300 min-h-screen flex flex-col">
 
-    <!-- Contenedor Toasts (Subido a z-[9999] para que siempre esté arriba) -->
+    <!-- Contenedor Toasts -->
     <div id="toast-container" class="fixed top-4 right-4 sm:top-6 sm:right-6 z-[9999] flex flex-col gap-3 w-72 max-w-[90vw]"></div>
 
     <!-- Login -->
@@ -216,18 +219,10 @@
                     </div>
                     
                     <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-subtle border dark:border-gray-700 overflow-hidden flex flex-col h-full">
-                        <div class="bg-blue-50/50 dark:bg-blue-900/10 p-5 border-b dark:border-gray-700 flex flex-col md:flex-row justify-between md:items-center gap-4">
-                            <h3 class="text-sm font-bold flex items-center gap-2"><i data-feather="truck" class="text-accent"></i> Marcar Envíos Masivos</h3>
-                            <div class="flex items-center gap-2">
-                                <input type="date" id="mass-shipping-date" class="px-3 py-2 border rounded-xl text-sm dark:bg-gray-800 dark:border-gray-600">
-                                <button id="mass-update-shipping-btn" class="px-4 py-2 bg-green-500 text-white font-bold rounded-xl text-sm hover:bg-green-600 shadow-sm transition-colors">Despachar</button>
-                            </div>
-                        </div>
                         <div class="overflow-x-auto">
                             <table class="min-w-full divide-y divide-gray-100 dark:divide-gray-700">
                                 <thead class="bg-gray-50 dark:bg-gray-800/80 text-xs font-bold text-gray-500 uppercase tracking-wider text-left">
                                     <tr>
-                                        <th class="px-4 py-4 text-center"><input type="checkbox" id="select-all-sales-checkbox" class="rounded w-4 h-4"></th>
                                         <th class="px-4 py-4">Fecha/Cliente</th>
                                         <th class="px-4 py-4">Producto</th>
                                         <th class="px-4 py-4 text-right">Total</th>
@@ -285,20 +280,49 @@
         <!-- Panel de Logística -->
         <div id="shipping-panel" class="tab-panel" hidden>
             <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-subtle border dark:border-gray-700 overflow-hidden">
-                <div class="p-6 border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex flex-col sm:flex-row justify-between items-center gap-4">
+                
+                <!-- Opciones de Búsqueda y Cruce -->
+                <div class="p-6 border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex flex-col md:flex-row justify-between items-center gap-4">
                     <h2 class="text-xl font-bold flex items-center gap-2"><i data-feather="map-pin" class="text-accent"></i> Rutas y Envíos</h2>
-                    <div class="flex gap-2 w-full sm:w-auto items-center">
-                        <span class="text-sm font-semibold text-gray-500">Seleccionar fecha:</span>
+                    
+                    <div class="flex gap-2 w-full md:w-auto items-center flex-wrap">
+                        <span class="text-sm font-semibold text-gray-500">Filtrar Fecha:</span>
                         <input type="date" id="shipping-date-filter" class="flex-1 sm:flex-none px-4 py-2 border rounded-xl text-sm dark:bg-gray-900 dark:border-gray-700 cursor-pointer">
+                        <span class="text-gray-300 dark:text-gray-600 hidden sm:inline">|</span>
+                        
+                        <label for="shipping-excel-upload" class="cursor-pointer px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-400 text-white rounded-xl font-bold shadow-md transition-all hover:shadow-lg flex items-center gap-2 text-sm whitespace-nowrap">
+                            <i data-feather="file-text" class="w-4 h-4"></i> Cargar Excel
+                        </label>
+                        <input type="file" id="shipping-excel-upload" accept=".csv, .xlsx, .xls" class="hidden">
+                        
+                        <button id="clear-excel-btn" class="hidden text-red-500 hover:text-red-700 p-2 transition-colors" title="Limpiar Excel">
+                            <i data-feather="x-circle" class="w-5 h-5"></i>
+                        </button>
                     </div>
                 </div>
+                
+                <!-- NUEVO: Barra de Envíos Masivos (Oculta hasta que se cargue Excel) -->
+                <div id="mass-shipping-bar" class="bg-blue-50/50 dark:bg-blue-900/10 p-5 border-b dark:border-gray-700 flex flex-col md:flex-row justify-between md:items-center gap-4 hidden">
+                    <h3 class="text-sm font-bold flex items-center gap-2"><i data-feather="truck" class="text-accent"></i> Despachar Seleccionados</h3>
+                    <div class="flex items-center gap-2">
+                        <input type="date" id="mass-shipping-date" class="px-3 py-2 border rounded-xl text-sm dark:bg-gray-800 dark:border-gray-600">
+                        <button id="mass-update-shipping-btn" class="px-4 py-2 bg-green-500 text-white font-bold rounded-xl text-sm hover:bg-green-600 shadow-sm transition-colors">Despachar</button>
+                    </div>
+                </div>
+
                 <div class="overflow-x-auto p-6">
                     <table class="min-w-full divide-y dark:divide-gray-700 ring-1 ring-gray-100 dark:ring-gray-700 rounded-2xl">
                         <thead class="bg-gray-50 dark:bg-gray-800/80 text-xs font-bold text-gray-500 uppercase text-left">
-                            <tr><th class="px-6 py-4">Cliente</th><th class="px-6 py-4">Detalle JSON Consolidado</th><th class="px-6 py-4 text-right">Acciones</th></tr>
+                            <tr>
+                                <th class="px-4 py-4 text-center"><input type="checkbox" id="select-all-shipping-checkbox" class="rounded w-4 h-4 cursor-pointer"></th>
+                                <th class="px-6 py-4">Courier</th>
+                                <th class="px-6 py-4">Cliente / Celular</th>
+                                <th class="px-6 py-4">Detalle JSON Consolidado</th>
+                                <th class="px-6 py-4 text-right">Acciones</th>
+                            </tr>
                         </thead>
                         <tbody id="all-shipments-list" class="divide-y dark:divide-gray-700/50">
-                            <tr><td colspan="3" class="px-6 py-12 text-center text-gray-400">Seleccione fecha arriba para buscar automáticamente.</td></tr>
+                            <tr><td colspan="5" class="px-6 py-12 text-center text-gray-400">Seleccione fecha arriba o cargue un Excel para buscar automáticamente.</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -431,7 +455,8 @@
             products: [],
             sales: [],
             expenses: [],
-            cart: []
+            cart: [],
+            uploadedShipments: [] // Estado para el excel de despachos
         };
 
         const formatter = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' });
@@ -553,7 +578,7 @@
             renderSalesTable();
             renderProductsTable();
             renderExpensesTable();
-            if(document.getElementById('shipping-date-filter').value) renderLogistics(); 
+            renderLogistics(); 
             renderCharts();
             renderTopClients();
             if(document.getElementById('report-date-filter').value) renderDailyClose();
@@ -794,7 +819,6 @@
                 const status = item.enviado ? `<span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">Enviado</span>` : `<span class="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs font-bold">Pendiente</span>`;
 
                 tr.innerHTML = `
-                    <td class="px-4 py-3 text-center"><input type="checkbox" class="sale-checkbox rounded w-4 h-4 cursor-pointer" data-id="${item.id}"></td>
                     <td class="px-4 py-3"><strong>${item.clientPhone}</strong><br><span class="text-xs text-gray-500">${item.date}</span></td>
                     <td class="px-4 py-3 leading-tight">${productHtml}</td>
                     <td class="px-4 py-3 text-right font-bold text-accent">${formatter.format(item.total)}<br><span class="text-[10px] text-gray-400 font-medium">${item.medioDePago}</span></td>
@@ -807,10 +831,6 @@
             });
             if(typeof feather !== 'undefined') feather.replace();
         }
-        
-        document.getElementById('select-all-sales-checkbox').addEventListener('change', (e) => {
-            document.querySelectorAll('.sale-checkbox').forEach(cb => cb.checked = e.target.checked);
-        });
 
         window.triggerDeleteSaleItem = function(itemId) {
             UI.confirm(
@@ -1026,64 +1046,219 @@
         }
 
         // ==========================================
-        // LOGÍSTICA (Búsqueda al cambiar fecha)
+        // LOGÍSTICA (Cruce de Excel & Despacho)
         // ==========================================
-        document.getElementById('shipping-date-filter').addEventListener('change', renderLogistics);
+
+        // Listener para limpiar la vista del Excel si se selecciona una fecha
+        document.getElementById('shipping-date-filter').addEventListener('change', () => {
+            AppState.uploadedShipments = []; // Limpiamos la memoria del excel cargado
+            document.getElementById('shipping-excel-upload').value = '';
+            document.getElementById('clear-excel-btn').classList.add('hidden');
+            renderLogistics();
+        });
+
+        // Parseador del Excel con SheetJS
+        document.getElementById('shipping-excel-upload').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const data = new Uint8Array(evt.target.result);
+                const workbook = XLSX.read(data, {type: 'array'});
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const json = XLSX.utils.sheet_to_json(worksheet, {defval: ""});
+                
+                // Mapear los clientes y extraer el Courier
+                AppState.uploadedShipments = json.map(row => {
+                    const phoneRaw = row['Teléfono'] || row['Telefono'] || row['Tel'] || row['phone'] || Object.values(row)[3] || '';
+                    const clientName = row['Cliente'] || row['Nombre'] || Object.values(row)[2] || '';
+                    const courier = row['Courier'] || row['courier'] || Object.values(row)[1] || 'Sin Courier';
+                    
+                    return {
+                        phone: String(phoneRaw).replace(/\D/g, ''), // Mantiene sólo los números
+                        name: clientName,
+                        courier: String(courier).trim(),
+                        raw: row
+                    };
+                }).filter(x => x.phone.length > 0); // Filtramos filas vacías
+                
+                // Reseteamos el calendario visualmente
+                document.getElementById('shipping-date-filter').value = ''; 
+                document.getElementById('clear-excel-btn').classList.remove('hidden');
+                UI.showToast("Excel Cargado", `Se identificaron ${AppState.uploadedShipments.length} clientes en el archivo.`);
+                renderLogistics();
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        // Botón con la X roja para quitar el Excel
+        document.getElementById('clear-excel-btn').addEventListener('click', () => {
+            AppState.uploadedShipments = [];
+            document.getElementById('shipping-excel-upload').value = '';
+            document.getElementById('clear-excel-btn').classList.add('hidden');
+            renderLogistics();
+        });
 
         function renderLogistics() {
             const date = document.getElementById('shipping-date-filter').value;
-            const tbody = document.getElementById('all-shipments-list'); tbody.innerHTML = '';
+            const tbody = document.getElementById('all-shipments-list'); 
+            const massShippingBar = document.getElementById('mass-shipping-bar');
+            tbody.innerHTML = '';
             
-            if(!date) {
-                tbody.innerHTML = `<tr><td colspan="3" class="p-6 text-center text-gray-400">Seleccione fecha arriba para buscar automáticamente.</td></tr>`; 
+            let displayShipments = [];
+
+            // --- MODO: EXCEL ---
+            if (AppState.uploadedShipments && AppState.uploadedShipments.length > 0) {
+                massShippingBar.classList.remove('hidden');
+                
+                AppState.uploadedShipments.forEach(ship => {
+                    let pendingItems = [];
+                    
+                    // Cruzamos por número de teléfono
+                    AppState.sales.forEach(sale => {
+                        sale.items.forEach(item => {
+                            const dbPhone = String(item.clientPhone).replace(/\D/g, '');
+                            // Si el número coincide y la venta está pendiente, lo sumamos
+                            if (!item.enviado && dbPhone === ship.phone) {
+                                pendingItems.push(item);
+                            }
+                        });
+                    });
+
+                    const totalItems = pendingItems.reduce((sum, item) => sum + Number(item.qty), 0);
+                    
+                    displayShipments.push({
+                        isExcel: true,
+                        clientPhone: ship.phone,
+                        clientName: ship.name,
+                        courier: ship.courier,
+                        items: pendingItems,
+                        totalItems: totalItems,
+                        date: new Date().toISOString().split('T')[0] // Se usará por defecto si copian
+                    });
+                });
+            } else if (date) {
+                // --- MODO: BÚSQUEDA POR FECHA (Tradicional) ---
+                massShippingBar.classList.add('hidden');
+                
+                const shipmentsByClient = {};
+                AppState.sales.forEach(sale => {
+                    sale.items.forEach(item => {
+                        if(item.enviado && item.fechaEnvio === date) {
+                            if (!shipmentsByClient[item.clientPhone]) {
+                                shipmentsByClient[item.clientPhone] = {
+                                    isExcel: false,
+                                    clientPhone: item.clientPhone,
+                                    clientName: sale.clientName || 'Cliente',
+                                    courier: '-',
+                                    date: date,
+                                    items: [],
+                                    totalItems: 0
+                                };
+                            }
+                            shipmentsByClient[item.clientPhone].items.push(item);
+                            shipmentsByClient[item.clientPhone].totalItems += Number(item.qty);
+                        }
+                    });
+                });
+                displayShipments = Object.values(shipmentsByClient);
+            } else {
+                massShippingBar.classList.add('hidden');
+                tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-gray-400">Seleccione fecha arriba o cargue un Excel para cruzar datos.</td></tr>`; 
                 return;
             }
 
-            let itemsToShip = [];
-            AppState.sales.forEach(sale => {
-                sale.items.forEach(item => {
-                    if(item.enviado && item.fechaEnvio === date) {
-                        itemsToShip.push(item);
-                    }
-                });
+            // Ordenamiento Mágico: Courier alfabético > Total de prendas desc.
+            displayShipments.sort((a, b) => {
+                const cA = (a.courier || '').toLowerCase();
+                const cB = (b.courier || '').toLowerCase();
+                if (cA < cB) return -1;
+                if (cA > cB) return 1;
+                return b.totalItems - a.totalItems;
             });
 
-            if(itemsToShip.length === 0) { 
-                tbody.innerHTML = `<tr><td colspan="3" class="p-6 text-center text-gray-500">No existen encomiendas programadas</td></tr>`; 
+            if (displayShipments.length === 0) { 
+                tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-gray-500">No hay datos que mostrar.</td></tr>`; 
                 return; 
             }
 
-            const shipmentsByClient = {};
-            itemsToShip.forEach(item => {
-                if (!shipmentsByClient[item.clientPhone]) {
-                    shipmentsByClient[item.clientPhone] = {
-                        clientPhone: item.clientPhone,
-                        date: date,
-                        medioDePago: item.medioDePago,
-                        total: 0,
-                        items: []
-                    };
-                }
-                shipmentsByClient[item.clientPhone].total += Number(item.total);
-                shipmentsByClient[item.clientPhone].items.push(item);
-            });
-
-            Object.values(shipmentsByClient).forEach(shipment => {
-                const detailLines = shipment.items.map(i => `<li class="text-xs py-1 border-b dark:border-gray-700"><strong>${i.qty}x ${toProperCase(i.desc)}</strong> (${i.color} / ${i.talla})</li>`).join('');
-                
+            displayShipments.forEach(shipment => {
                 const tr = document.createElement('tr'); tr.className = "text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors";
+                
+                let detailLines = '';
+                let actionBtn = '';
+                let checkboxHtml = '';
+                
+                if (shipment.items.length > 0) {
+                    detailLines = shipment.items.map(i => `<li class="text-xs py-1 border-b dark:border-gray-700"><strong>${i.qty}x ${toProperCase(i.desc)}</strong> (${i.color} / ${i.talla})</li>`).join('');
+                    
+                    const shipmentData = {
+                        clientPhone: shipment.clientPhone,
+                        date: shipment.date,
+                        items: shipment.items
+                    };
+                    
+                    actionBtn = `<button onclick="copyShipment('${encodeURIComponent(JSON.stringify(shipmentData))}')" class="p-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg text-gray-600 dark:text-white transition-colors"><i data-feather="copy" class="w-4 h-4"></i></button>`;
+                    
+                    // Solo habilitamos Checkbox para despachar si vino por el excel
+                    if (shipment.isExcel) {
+                        const itemIds = shipment.items.map(i => i.id).join(',');
+                        checkboxHtml = `<input type="checkbox" class="shipping-checkbox rounded w-4 h-4 cursor-pointer" data-ids="${itemIds}">`;
+                    }
+                } else {
+                    detailLines = `<li class="text-xs py-1 text-gray-400 italic">No tiene prendas pendientes de envío.</li>`;
+                }
+
                 tr.innerHTML = `
-                    <td class="px-6 py-4"><strong>${shipment.clientPhone}</strong></td>
-                    <td class="px-6 py-4"><ul>${detailLines}</ul></td>
-                    <td class="px-6 py-4 text-right">
-                        <button onclick="copyShipment('${encodeURIComponent(JSON.stringify(shipment))}')" class="p-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg text-gray-600 dark:text-white transition-colors"><i data-feather="copy" class="w-4 h-4"></i></button>
+                    <td class="px-4 py-4 text-center">${checkboxHtml}</td>
+                    <td class="px-6 py-4 font-semibold text-gray-600 dark:text-gray-300">${toProperCase(shipment.courier)}</td>
+                    <td class="px-6 py-4">
+                        <strong>${toProperCase(shipment.clientName) || 'Cliente'}</strong><br>
+                        <span class="text-xs text-gray-500 font-mono">${shipment.clientPhone}</span>
                     </td>
+                    <td class="px-6 py-4"><ul>${detailLines}</ul></td>
+                    <td class="px-6 py-4 text-right">${actionBtn}</td>
                 `;
                 tbody.appendChild(tr);
             });
             if(typeof feather !== 'undefined') feather.replace();
         }
 
+        // Manejo del checkbox de "Seleccionar Todos" en envíos
+        document.getElementById('select-all-shipping-checkbox').addEventListener('change', (e) => {
+            document.querySelectorAll('.shipping-checkbox').forEach(cb => cb.checked = e.target.checked);
+        });
+
+        // ==========================================
+        // MASIVO ENVÍOS (Ahora en Logística)
+        // ==========================================
+        document.getElementById('mass-update-shipping-btn').addEventListener('click', async () => {
+            const date = document.getElementById('mass-shipping-date').value;
+            const checkedBoxes = Array.from(document.querySelectorAll('.shipping-checkbox:checked'));
+            
+            let allItemsIds = [];
+            checkedBoxes.forEach(cb => {
+                if (cb.dataset.ids) {
+                    allItemsIds = allItemsIds.concat(cb.dataset.ids.split(','));
+                }
+            });
+
+            if(!date || !allItemsIds.length) return UI.showToast("Atención", "Elige una fecha y marca al menos un cliente en la lista.", "error");
+            
+            UI.showModal("Despachando", `Marcando ${allItemsIds.length} prendas como enviadas en la base JSON...`);
+            try {
+                await fetchGAS('updateShippingMasive', { itemsIds: allItemsIds, fechaEnvio: date });
+                await syncData();
+                UI.showToast("Éxito", `Envíos actualizados en la base de datos.`);
+                document.getElementById('select-all-shipping-checkbox').checked = false;
+            } catch(e) { 
+                UI.hideModal(); 
+                UI.showToast("Error", e.message, "error"); 
+            }
+        });
+
+        // Formato para Whatsapp 
         window.copyShipment = function(saleEncoded) {
             const sale = JSON.parse(decodeURIComponent(saleEncoded));
             let totalPrendas = 0;
@@ -1119,32 +1294,13 @@
             
             try {
                 document.execCommand('copy');
-                UI.showToast("Copiado", "Pégalo directamente en el WhatsApp del cliente.");
+                UI.showToast("Copiado", "Mensaje listo en el portapapeles.");
             } catch (err) {
                 UI.showToast("Error", "No se pudo copiar el texto.", "error");
             }
             
             document.body.removeChild(textArea);
         }
-
-        // ==========================================
-        // MASIVO ENVÍOS
-        // ==========================================
-        document.getElementById('mass-update-shipping-btn').addEventListener('click', async () => {
-            const date = document.getElementById('mass-shipping-date').value;
-            const checked = Array.from(document.querySelectorAll('.sale-checkbox:checked')).map(cb => cb.dataset.id);
-            if(!date || !checked.length) return UI.showToast("Atención", "Elige una fecha y marca al menos una venta.", "error");
-            
-            UI.showModal("Despachando", `Enviando estado de ${checked.length} pedidos al servidor JSON...`);
-            try {
-                await fetchGAS('updateShippingMasive', { itemsIds: checked, fechaEnvio: date });
-                await syncData();
-                UI.showToast("Éxito", `Paquetes despachados correctamente.`);
-            } catch(e) { 
-                UI.hideModal(); 
-                UI.showToast("Error", e.message, "error"); 
-            }
-        });
 
         // ==========================================
         // GRÁFICOS Y REPORTES (Búsqueda automática)
